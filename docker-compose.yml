@@ -1,0 +1,27 @@
+services:
+  mysql-db:
+    image: mysql:8.0
+    container_name: micro_approval_mysql
+    restart: unless-stopped
+
+    environment:
+      MYSQL_DATABASE: micro_approval_db
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_USER: dev_user
+      MYSQL_PASSWORD: dev_password
+
+    ports:
+      - "3306:3306"
+
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+    networks:
+      - micro_approval_network
+
+networks:
+  micro_approval_network:
+    driver: bridge
+
+volumes:
+  mysql_data:
