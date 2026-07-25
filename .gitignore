@@ -5,6 +5,9 @@ backend/target/
 # Frontend dependencies and build output
 frontend/node_modules/
 frontend/dist/
+frontend/*.tsbuildinfo
+frontend/vite.config.js
+frontend/vite.config.d.ts
 
 # IDE and operating system files
 .idea/
