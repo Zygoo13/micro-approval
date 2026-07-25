@@ -26,8 +26,30 @@ spring:
         format_sql: true
 
   ai:
+    model:
+      chat: ${AI_PROVIDER:openai}
     openai:
       api-key: ${OPENAI_API_KEY}
+      chat:
+        options:
+          model: ${OPENAI_MODEL:gpt-4.1-mini}
+    google:
+      genai:
+        api-key: ${GOOGLE_GENAI_API_KEY:}
+        chat:
+          options:
+            model: ${GOOGLE_GENAI_MODEL:gemini-2.5-flash}
+
+rule-engine:
+  max-cards-per-session: ${RULE_ENGINE_MAX_CARDS_PER_SESSION:10}
+
+ai:
+  analysis:
+    enabled: ${AI_ANALYSIS_ENABLED:true}
+    max-cards-per-session: ${AI_ANALYSIS_MAX_CARDS_PER_SESSION:10}
+  credentials:
+    # Required before a user can save an AI key. Generate once: openssl rand -base64 32
+    encryption-key: ${AI_CREDENTIAL_ENCRYPTION_KEY:}
 
 jwt:
   secret: ${JWT_SECRET:super_secret_key_for_micro_approval_project_123456}

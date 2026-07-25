@@ -1,6 +1,7 @@
-import type { AnalysisMode, AuthResponse, DecisionStatus, MicroDecision, PersonalSession } from '../types'
+import type { AiConfiguration, AiProviderType, AnalysisMode, AuthResponse, DecisionStatus, MicroDecision, PersonalSession } from '../types'
 
 const TOKEN_KEY = 'micro-approval-token'
+const API_PREFIX = '/gateway/v1'
 
 export const auth = {
   getToken: () => localStorage.getItem(TOKEN_KEY),
@@ -22,6 +23,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (!response.ok) {
     const problem = await response.json().catch(() => null)
+    if (response.status === 401) auth.clearToken()
     throw new Error(problem?.detail ?? 'Không thể kết nối đến máy chủ')
   }
 
@@ -30,16 +32,20 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 export const api = {
   register: (payload: { fullName: string; email: string; password: string }) =>
-    request<AuthResponse>('/api/v1/auth/register', { method: 'POST', body: JSON.stringify(payload) }),
+    request<AuthResponse>(`${API_PREFIX}/auth/register`, { method: 'POST', body: JSON.stringify(payload) }),
   login: (payload: { email: string; password: string }) =>
-    request<AuthResponse>('/api/v1/auth/login', { method: 'POST', body: JSON.stringify(payload) }),
-  listSessions: () => request<PersonalSession[]>('/api/v1/personal/sessions'),
-  getSession: (id: string) => request<PersonalSession>(`/api/v1/personal/sessions/${id}`),
+    request<AuthResponse>(`${API_PREFIX}/auth/login`, { method: 'POST', body: JSON.stringify(payload) }),
+  listSessions: () => request<PersonalSession[]>(`${API_PREFIX}/personal/sessions`),
+  getSession: (id: string) => request<PersonalSession>(`${API_PREFIX}/personal/sessions/${id}`),
   createSession: (payload: { title: string; mode: AnalysisMode; rawContent: string; promptContent?: string }) =>
-    request<PersonalSession>('/api/v1/personal/sessions', { method: 'POST', body: JSON.stringify(payload) }),
+    request<PersonalSession>(`${API_PREFIX}/personal/sessions`, { method: 'POST', body: JSON.stringify(payload) }),
   vote: (decisionId: string, humanDecision: DecisionStatus, reviewerNote?: string) =>
-    request<MicroDecision>(`/api/v1/personal/sessions/decisions/${decisionId}`, {
+    request<MicroDecision>(`${API_PREFIX}/personal/sessions/decisions/${decisionId}`, {
       method: 'PATCH', body: JSON.stringify({ humanDecision, reviewerNote }),
     }),
-  deleteSession: (id: string) => request<void>(`/api/v1/personal/sessions/${id}`, { method: 'DELETE' }),
+  deleteSession: (id: string) => request<void>(`${API_PREFIX}/personal/sessions/${id}`, { method: 'DELETE' }),
+  getAiConfiguration: () => request<AiConfiguration>(`${API_PREFIX}/personal/ai-configuration`),
+  saveAiConfiguration: (payload: { provider: AiProviderType; model: string; apiKey?: string; enabled: boolean }) => request<AiConfiguration>(`${API_PREFIX}/personal/ai-configuration`, { method: 'PUT', body: JSON.stringify(payload) }),
+  deleteAiConfiguration: () => request<void>(`${API_PREFIX}/personal/ai-configuration`, { method: 'DELETE' }),
+  testAiConfiguration: () => request<{ success: boolean; message: string }>(`${API_PREFIX}/personal/ai-configuration/test`, { method: 'POST' }),
 }

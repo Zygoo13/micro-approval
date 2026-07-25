@@ -62,6 +62,13 @@ public class ReviewSession {
     @Column(name = "ai_token_used")
     private Integer aiTokenUsed;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "ai_analysis_status", nullable = false)
+    private AiAnalysisStatus aiAnalysisStatus;
+
+    @Column(name = "ai_analysis_error", length = 500)
+    private String aiAnalysisError;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
@@ -87,6 +94,9 @@ public class ReviewSession {
         }
         if (this.aiTokenUsed == null) {
             this.aiTokenUsed = 0;
+        }
+        if (this.aiAnalysisStatus == null) {
+            this.aiAnalysisStatus = AiAnalysisStatus.NOT_REQUESTED;
         }
     }
 }

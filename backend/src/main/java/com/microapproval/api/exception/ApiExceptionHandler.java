@@ -48,4 +48,9 @@ public class ApiExceptionHandler {
     ProblemDetail handleInvalidOperation(InvalidOperationException exception) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage());
     }
+
+    @ExceptionHandler(AiCredentialEncryptionUnavailableException.class)
+    ProblemDetail handleAiCredentialEncryptionUnavailable(AiCredentialEncryptionUnavailableException exception) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage());
+    }
 }

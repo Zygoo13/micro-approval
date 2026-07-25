@@ -30,7 +30,13 @@ export interface PersonalSession {
   rawContent: string
   promptContent: string | null
   status: SessionStatus
+  aiAnalysisStatus: 'NOT_REQUESTED' | 'SUCCEEDED' | 'FALLBACK' | 'DISABLED'
+  aiAnalysisError: string | null
+  aiTokenUsed: number
   createdAt: string
   completedAt: string | null
   decisions: MicroDecision[]
 }
+
+export type AiProviderType = 'OPENAI' | 'GOOGLE_GENAI'
+export interface AiConfiguration { configured: boolean; provider: AiProviderType | null; model: string | null; enabled: boolean; keySuffix: string | null; updatedAt: string | null }

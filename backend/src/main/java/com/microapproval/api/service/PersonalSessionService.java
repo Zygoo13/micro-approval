@@ -4,6 +4,7 @@ import com.microapproval.api.dto.CreatePersonalSessionRequest;
 import com.microapproval.api.dto.DecisionVoteRequest;
 import com.microapproval.api.dto.MicroDecisionResponse;
 import com.microapproval.api.dto.PersonalSessionResponse;
+import com.microapproval.api.config.AiAnalysisProperties;
 import com.microapproval.api.entity.*;
 import com.microapproval.api.exception.ForbiddenOperationException;
 import com.microapproval.api.exception.InvalidOperationException;
@@ -18,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.ArrayList;
 
 @Service
 @RequiredArgsConstructor
@@ -27,6 +29,9 @@ public class PersonalSessionService {
     private final MicroDecisionRepository decisionRepository;
     private final UserRepository userRepository;
     private final RuleEngineService ruleEngineService;
+    private final AiAnalysisProperties aiAnalysisProperties;
+    private final AiAnalysisClient aiAnalysisClient;
+    private final AiConfigurationService aiConfigurationService;
 
     // TẠO PHIÊN CÁ NHÂN
     @Transactional
@@ -44,11 +49,18 @@ public class PersonalSessionService {
                 .promptContent(request.getPromptContent())
                 .submittedBy(currentUser)
                 .status(SessionStatus.PENDING)
+                .aiTokenUsed(0)
+                .aiAnalysisStatus(AiAnalysisStatus.NOT_REQUESTED)
                 .build();
 
         session = sessionRepository.save(session);
 
-        List<MicroDecision> decisions = ruleEngineService.analyze(session);
+        RuleAnalysisResult ruleAnalysis = ruleEngineService.analyzeWithRemainingContent(session);
+        List<MicroDecision> decisions = new ArrayList<>(ruleAnalysis.decisions());
+        appendAiDecisions(session, currentUser, ruleAnalysis.remainingContent(), decisions);
+        for (int index = 0; index < decisions.size(); index++) {
+            decisions.get(index).setDisplayOrder(index + 1);
+        }
         if (decisions.isEmpty()) {
             session.setStatus(SessionStatus.APPROVED);
             session.setCompletedAt(LocalDateTime.now());
@@ -169,5 +181,58 @@ public class PersonalSessionService {
 
     private PersonalSessionResponse toResponse(ReviewSession session, List<MicroDecisionResponse> decisions) {
         return PersonalSessionResponse.from(session, decisions);
+    }
+
+    private void appendAiDecisions(ReviewSession session, User currentUser, String remainingContent, List<MicroDecision> decisions) {
+        if (!aiAnalysisProperties.isEnabled()) {
+            session.setAiAnalysisStatus(AiAnalysisStatus.DISABLED);
+            return;
+        }
+        if (remainingContent.isBlank() || decisions.size() >= aiAnalysisProperties.getMaxCardsPerSession()) {
+            session.setAiAnalysisStatus(AiAnalysisStatus.NOT_REQUESTED);
+            return;
+        }
+
+        AiProviderConfiguration configuration = aiConfigurationService.activeFor(currentUser).orElse(null);
+        if (configuration == null) {
+            session.setAiAnalysisStatus(AiAnalysisStatus.DISABLED);
+            return;
+        }
+
+        try {
+            AiAnalysisResult result = aiAnalysisClient.analyze(configuration, remainingContent);
+            int remainingCapacity = aiAnalysisProperties.getMaxCardsPerSession() - decisions.size();
+            result.decisions().stream()
+                    .filter(this::isValidAiCandidate)
+                    .limit(remainingCapacity)
+                    .map(candidate -> MicroDecision.builder()
+                            .session(session)
+                            .engineType(EngineType.AI_BASED)
+                            .riskCategory(candidate.riskCategory())
+                            .riskLevel(candidate.riskLevel())
+                            .codeSnippet(candidate.codeSnippet())
+                            .questionText(candidate.questionText())
+                            .isAiBypassed(false)
+                            .build())
+                    .forEach(decisions::add);
+            session.setAiTokenUsed(result.totalTokens());
+            session.setAiAnalysisStatus(AiAnalysisStatus.SUCCEEDED);
+            session.setAiAnalysisError(null);
+        } catch (com.microapproval.api.exception.AiProviderException | com.microapproval.api.exception.AiCredentialEncryptionUnavailableException exception) {
+            markAiFallback(session, exception.getMessage());
+        } catch (RuntimeException exception) {
+            markAiFallback(session, "AI tạm thời không khả dụng; hệ thống tiếp tục với Rule Engine.");
+        }
+    }
+
+    private boolean isValidAiCandidate(AiDecisionCandidate candidate) {
+        return candidate != null && candidate.riskCategory() != null && candidate.riskLevel() != null
+                && candidate.codeSnippet() != null && !candidate.codeSnippet().isBlank()
+                && candidate.questionText() != null && !candidate.questionText().isBlank();
+    }
+
+    private void markAiFallback(ReviewSession session, String message) {
+        session.setAiAnalysisStatus(AiAnalysisStatus.FALLBACK);
+        session.setAiAnalysisError(message);
     }
 }
