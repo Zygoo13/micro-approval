@@ -2,7 +2,13 @@ package com.microapproval.api.service;
 
 import com.microapproval.api.dto.CreatePersonalSessionRequest;
 import com.microapproval.api.dto.DecisionVoteRequest;
+import com.microapproval.api.dto.MicroDecisionResponse;
+import com.microapproval.api.dto.PersonalSessionResponse;
 import com.microapproval.api.entity.*;
+import com.microapproval.api.exception.ForbiddenOperationException;
+import com.microapproval.api.exception.InvalidOperationException;
+import com.microapproval.api.exception.ResourceNotFoundException;
+import com.microapproval.api.exception.ConflictException;
 import com.microapproval.api.repository.MicroDecisionRepository;
 import com.microapproval.api.repository.ReviewSessionRepository;
 import com.microapproval.api.repository.UserRepository;
@@ -20,13 +26,14 @@ public class PersonalSessionService {
     private final ReviewSessionRepository sessionRepository;
     private final MicroDecisionRepository decisionRepository;
     private final UserRepository userRepository;
+    private final RuleEngineService ruleEngineService;
 
     // TẠO PHIÊN CÁ NHÂN
     @Transactional
-    public ReviewSession createSession(CreatePersonalSessionRequest request, String userEmail) {
+    public PersonalSessionResponse createSession(CreatePersonalSessionRequest request, String userEmail) {
         // Tìm user dựa trên email truyền từ Controller xuống [5]
         User currentUser = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy User"));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
 
         // Tạo mới Review Session sử dụng Enum cho các trạng thái và chế độ [5]
         ReviewSession session = ReviewSession.builder()
@@ -41,47 +48,54 @@ public class PersonalSessionService {
 
         session = sessionRepository.save(session);
 
-        // Chạy Mock Engine để sinh thẻ rủi ro
-        generateMockDecisionCards(session);
+        List<MicroDecision> decisions = ruleEngineService.analyze(session);
+        if (decisions.isEmpty()) {
+            session.setStatus(SessionStatus.APPROVED);
+            session.setCompletedAt(LocalDateTime.now());
+            sessionRepository.save(session);
+        } else {
+            decisionRepository.saveAll(decisions);
+        }
 
-        return session;
+        return toResponseFromEntities(session, decisions);
     }
 
     // LẤY DANH SÁCH PHIÊN CÁ NHÂN (Quy tắc bảo mật số 10)
-    public List<ReviewSession> getMyPersonalSessions(String userEmail) {
+    @Transactional(readOnly = true)
+    public List<PersonalSessionResponse> getMyPersonalSessions(String userEmail) {
         User currentUser = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy User"));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
 
         // Lọc nghiêm ngặt: Chỉ lấy của chính user đó và thuộc không gian PERSONAL [3]
         return sessionRepository.findAllBySubmittedByIdAndWorkspaceTypeOrderByCreatedAtDesc(
                 currentUser.getId(), WorkspaceType.PERSONAL
-        );
+        ).stream().map(session -> toResponse(session, List.of())).toList();
     }
 
     // CẬP NHẬT QUYẾT ĐỊNH THẺ CÁ NHÂN (VOTE)
     @Transactional
-    public MicroDecision voteDecision(String decisionId, DecisionVoteRequest request, String userEmail) {
+    public MicroDecisionResponse voteDecision(String decisionId, DecisionVoteRequest request, String userEmail) {
         User currentUser = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy User"));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
 
         MicroDecision decision = decisionRepository.findById(decisionId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy Thẻ quyết định"));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thẻ quyết định"));
 
         ReviewSession session = decision.getSession();
 
         // BR-04: Xác thực quyền riêng tư tuyệt đối [3, 4]
         if (session.getWorkspaceType() != WorkspaceType.PERSONAL ||
                 !session.getSubmittedBy().getId().equals(currentUser.getId())) {
-            throw new RuntimeException("Bạn không có quyền truy cập thẻ quyết định này");
+            throw new ForbiddenOperationException("Bạn không có quyền truy cập thẻ quyết định này");
         }
 
         // BR-18: Xác thực trạng thái thẻ - Không thể sửa thẻ đã xử lý [4]
         if (decision.getHumanDecision() != DecisionStatus.PENDING) {
-            throw new RuntimeException("Thẻ này đã được xử lý, không thể thay đổi quyết định (BR-18)");
+            throw new ConflictException("Thẻ này đã được xử lý, không thể thay đổi quyết định (BR-18)");
         }
 
         if (request.getHumanDecision() == DecisionStatus.PENDING) {
-            throw new RuntimeException("Trạng thái vote không hợp lệ");
+            throw new InvalidOperationException("Trạng thái vote không hợp lệ");
         }
 
         // Cập nhật quyết định cho thẻ
@@ -95,7 +109,7 @@ public class PersonalSessionService {
         // Kiểm tra và tự động cập nhật trạng thái của toàn phiên
         checkAndUpdateSessionStatus(session);
 
-        return decision;
+        return MicroDecisionResponse.from(decision);
     }
 
     // KIỂM TRA TRẠNG THÁI PHIÊN SAU KHI VOTE
@@ -124,46 +138,36 @@ public class PersonalSessionService {
         }
     }
 
-    // --- MOCK LOGIC TẠO THẺ ---
-    private void generateMockDecisionCards(ReviewSession session) {
-        MicroDecision card1 = MicroDecision.builder()
-                .session(session)
-                .engineType(EngineType.RULE_BASED)
-                .riskCategory(RiskCategory.SECURITY)
-                .riskLevel(RiskLevel.HIGH)
-                .codeSnippet("SELECT * FROM users WHERE username = '" + " + userInput + " + "';")
-                .questionText("Phát hiện lỗi nối chuỗi SQL (SQL Injection). Bạn có chắc chắn đoạn code này đã được sanitize an toàn chưa?")
-                .humanDecision(DecisionStatus.PENDING)
-                .displayOrder(1)
-                .build();
-
-        MicroDecision card2 = MicroDecision.builder()
-                .session(session)
-                .engineType(EngineType.RULE_BASED)
-                .riskCategory(RiskCategory.DEPENDENCY)
-                .riskLevel(RiskLevel.MEDIUM)
-                .codeSnippet("import fast-json-parser;")
-                .questionText("Thư viện fast-json-parser mới được thêm vào. Bạn đã kiểm tra các lỗ hổng CVE của thư viện này chưa?")
-                .humanDecision(DecisionStatus.PENDING)
-                .displayOrder(2)
-                .build();
-
-        decisionRepository.saveAll(List.of(card1, card2));
-    }
-    // XEM CHI TIẾT PHIÊN CÁ NHÂN (Xác thực quyền sở hữu nghiêm ngặt)
-    public ReviewSession getSessionDetail(String sessionId, String userEmail) {
+    @Transactional(readOnly = true)
+    public PersonalSessionResponse getSessionDetail(String sessionId, String userEmail) {
         User currentUser = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy User"));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
 
         // Tìm kiếm và ép điều kiện sở hữu + không gian Personal để chống xem chéo dữ liệu
         ReviewSession session = sessionRepository.findByIdAndSubmittedByIdAndWorkspaceType(
                 sessionId, currentUser.getId(), WorkspaceType.PERSONAL
-        ).orElseThrow(() -> new RuntimeException("Không tìm thấy phiên kiểm duyệt cá nhân hoặc bạn không có quyền truy cập"));
+        ).orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phiên kiểm duyệt cá nhân"));
 
         // Truy vấn danh sách các thẻ quyết định thuộc về phiên này
         List<MicroDecision> decisions = decisionRepository.findBySessionIdOrderByDisplayOrderAsc(sessionId);
-        session.setDecisions(decisions);
+        return toResponse(session, decisions.stream().map(MicroDecisionResponse::from).toList());
+    }
 
-        return session;
+    @Transactional
+    public void deleteSession(String sessionId, String userEmail) {
+        User currentUser = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
+        ReviewSession session = sessionRepository.findByIdAndSubmittedByIdAndWorkspaceType(
+                sessionId, currentUser.getId(), WorkspaceType.PERSONAL
+        ).orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phiên kiểm duyệt cá nhân"));
+        sessionRepository.delete(session);
+    }
+
+    private PersonalSessionResponse toResponseFromEntities(ReviewSession session, List<MicroDecision> decisions) {
+        return toResponse(session, decisions.stream().map(MicroDecisionResponse::from).toList());
+    }
+
+    private PersonalSessionResponse toResponse(ReviewSession session, List<MicroDecisionResponse> decisions) {
+        return PersonalSessionResponse.from(session, decisions);
     }
 }

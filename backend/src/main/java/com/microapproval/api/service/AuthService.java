@@ -5,6 +5,8 @@ import com.microapproval.api.dto.AuthResponse;
 import com.microapproval.api.dto.LoginRequest;
 import com.microapproval.api.dto.RegisterRequest;
 import com.microapproval.api.entity.User;
+import com.microapproval.api.exception.ConflictException;
+import com.microapproval.api.exception.ResourceNotFoundException;
 import com.microapproval.api.repository.UserRepository;
 import com.microapproval.api.security.JwtService;
 import lombok.RequiredArgsConstructor;
@@ -31,7 +33,7 @@ public class AuthService {
     public AuthResponse register(RegisterRequest registerRequest){
         // Kiểm tra xem email đã tồn tại trong hệ thống chưa
         if(userRepository.existsUserByEmail(registerRequest.getEmail())){
-            throw new RuntimeException("Email đã tồn tại trong hệ thống");
+            throw new ConflictException("Email đã tồn tại trong hệ thống");
         }
         // Khởi tạo User Entity mới
         User user = User.builder()
@@ -64,7 +66,7 @@ public class AuthService {
 
         // Nếu thông tin đăng nhập đúng, truy xuất thông tin User từ Database
         User user = userRepository.findByEmail(loginRequest.getEmail())
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng với email: " + loginRequest.getEmail()));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
 
         // Sinh JWT mới
         String jwtToken = generateToken(user);

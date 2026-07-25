@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import io.jsonwebtoken.JwtException;
 
 @Component
 @RequiredArgsConstructor
@@ -42,7 +43,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         // 2. Trích xuất Token JWT từ chuỗi "Bearer <token>"
         jwt = authHeader.substring(7);
-        userEmail = jwtService.extractUsername(jwt);
+        try {
+            userEmail = jwtService.extractUsername(jwt);
+        } catch (JwtException | IllegalArgumentException exception) {
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "JWT không hợp lệ hoặc đã hết hạn");
+            return;
+        }
 
         // 3. Nếu tìm thấy email trong token và request này chưa được xác thực trong Session hiện tại
         if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {

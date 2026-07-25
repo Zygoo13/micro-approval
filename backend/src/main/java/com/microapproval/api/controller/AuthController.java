@@ -5,7 +5,9 @@ import com.microapproval.api.dto.LoginRequest;
 import com.microapproval.api.dto.RegisterRequest;
 import com.microapproval.api.service.AuthService;
 import lombok.RequiredArgsConstructor;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -18,15 +20,15 @@ public class AuthController {
     // API: POST http://localhost:8080/api/v1/auth/register
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(
-            @RequestBody RegisterRequest request
+            @Valid @RequestBody RegisterRequest request
     ) {
-        return ResponseEntity.ok(authService.register(request));
+        return ResponseEntity.status(HttpStatus.CREATED).body(authService.register(request));
     }
 
     // API: POST http://localhost:8080/api/v1/auth/login
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(
-            @RequestBody LoginRequest request
+            @Valid @RequestBody LoginRequest request
     ) {
         return ResponseEntity.ok(authService.login(request));
     }

@@ -19,7 +19,8 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate # BẮT BUỘC LÀ VALIDATE: Ép hệ thống dùng Flyway, không cho Hibernate tự sửa bảng
-    show-sql: true
+    open-in-view: false
+    show-sql: false
     properties:
       hibernate:
         format_sql: true

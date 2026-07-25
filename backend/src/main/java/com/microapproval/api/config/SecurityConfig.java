@@ -9,6 +9,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
@@ -31,6 +32,7 @@ public class SecurityConfig {
 
                 // 1. Tắt CSRF (vì chúng ta dùng stateless JWT Token, không dùng Session Cookie)
                 .csrf(AbstractHttpConfigurer::disable)
+                .cors(Customizer.withDefaults())
 
                 // 2. Cấu hình phân quyền truy cập API
                 .authorizeHttpRequests(auth -> auth
