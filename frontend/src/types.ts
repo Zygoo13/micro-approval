@@ -38,6 +38,40 @@ export interface PersonalSession {
   decisions: MicroDecision[]
 }
 
+export type SharedReviewSessionMode = AnalysisMode
+export type SharedReviewSessionStatus = SessionStatus
+export type AiAnalysisStatus = 'NOT_REQUESTED' | 'SUCCEEDED' | 'FALLBACK' | 'DISABLED'
+export type SharedDecisionCard = MicroDecision
+
+export interface CreateSharedReviewSessionRequest {
+  title: string
+  mode: SharedReviewSessionMode
+  rawContent: string
+  promptContent?: string
+}
+
+export interface SharedReviewSessionSummary {
+  id: string
+  workspaceId: string
+  workspaceType: 'SHARED'
+  title: string
+  mode: SharedReviewSessionMode
+  status: SharedReviewSessionStatus
+  aiAnalysisStatus: AiAnalysisStatus
+  createdByUserId: string
+  createdByDisplayName: string
+  createdAt: string
+}
+
+export interface SharedReviewSessionDetail extends SharedReviewSessionSummary {
+  rawContent: string
+  promptContent: string | null
+  aiAnalysisError: string | null
+  aiTokenUsed: number
+  completedAt: string | null
+  decisions: SharedDecisionCard[]
+}
+
 export type AiProviderType = 'OPENAI' | 'GOOGLE_GENAI'
 export interface AiConfiguration { configured: boolean; provider: AiProviderType | null; model: string | null; enabled: boolean; keySuffix: string | null; updatedAt: string | null }
 

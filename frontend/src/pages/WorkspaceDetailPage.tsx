@@ -4,6 +4,7 @@ import { ApiError, api } from '../lib/api'
 import type { WorkspaceDetail } from '../types'
 import WorkspaceMembersSection from '../features/workspace/WorkspaceMembersSection'
 import WorkspaceInvitationsSection from '../features/workspace/WorkspaceInvitationsSection'
+import WorkspaceSessionsSection from '../features/workspace/WorkspaceSessionsSection'
 
 const roleLabels: Record<WorkspaceDetail['currentUserRole'], string> = {
   OWNER: 'Chủ sở hữu',
@@ -89,7 +90,7 @@ export default function WorkspaceDetailPage() {
       <a href="#overview">Tổng quan</a>
       <a href="#members">Members</a>
       {canManageInvitations && <a href="#invitations">Invitations</a>}
-      <a href="#team-sessions">Team Sessions</a>
+      <a href="#sessions">Sessions</a>
     </nav>
 
     <dl id="overview" className="workspace-metadata">
@@ -111,11 +112,6 @@ export default function WorkspaceDetailPage() {
 
     {canManageInvitations && <WorkspaceInvitationsSection workspace={workspace} />}
 
-    <div className="placeholder-grid single">
-      <section id="team-sessions" className="placeholder-card">
-        <h2>Workspace Sessions</h2>
-        <p>Phiên kiểm duyệt nhóm sẽ được bổ sung trong một vertical slice riêng.</p>
-      </section>
-    </div>
+    <WorkspaceSessionsSection workspace={workspace} />
   </section>
 }

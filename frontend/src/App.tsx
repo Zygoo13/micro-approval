@@ -8,6 +8,9 @@ import MyInvitationsPage from './pages/MyInvitationsPage'
 import RegisterPage from './pages/RegisterPage'
 import SessionDetailPage from './pages/SessionDetailPage'
 import SessionsPage from './pages/SessionsPage'
+import CreateSharedSessionPage from './pages/CreateSharedSessionPage'
+import SharedSessionDetailPage from './pages/SharedSessionDetailPage'
+import SharedSessionsPage from './pages/SharedSessionsPage'
 import WorkspaceDetailPage from './pages/WorkspaceDetailPage'
 import WorkspaceListPage from './pages/WorkspaceListPage'
 
@@ -66,6 +69,15 @@ export default function App() {
     } />
     <Route path="/workspaces/:workspaceId" element={
       <Protected><Layout><WorkspaceDetailPage /></Layout></Protected>
+    } />
+    <Route path="/workspaces/:workspaceId/sessions" element={
+      <Protected><Layout><SharedSessionsPage /></Layout></Protected>
+    } />
+    <Route path="/workspaces/:workspaceId/sessions/new" element={
+      <Protected><Layout><CreateSharedSessionPage /></Layout></Protected>
+    } />
+    <Route path="/workspaces/:workspaceId/sessions/:sessionId" element={
+      <Protected><Layout><SharedSessionDetailPage /></Layout></Protected>
     } />
     <Route path="/invitations" element={
       <Protected><Layout><MyInvitationsPage /></Layout></Protected>

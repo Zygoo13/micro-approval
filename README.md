@@ -17,6 +17,8 @@ Micro Approval is a code-review workflow that turns deterministic and AI-assiste
   expiration UI, and transactional membership activation.
 - Backend Shared Review Sessions for Raw Snippet, Intent Matching, and Git Diff,
   reusing the Rule → AI pipeline with workspace-isolated rules and Decision Cards.
+- Frontend Shared Review Session list, create, and detail flows with protected
+  workspace routes, role-aware creation, Decision Cards, and AI fallback states.
 - Flyway-managed MySQL schema.
 
 See [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) for the architectural map, conventions, and module roadmap.

@@ -41,6 +41,23 @@ webhooks, and integrations remain outside these slices.
 
 ## Frontend
 
+Shared Review Sessions are available through protected routes:
+
+```text
+/workspaces/:workspaceId/sessions
+/workspaces/:workspaceId/sessions/new
+/workspaces/:workspaceId/sessions/:sessionId
+```
+
+Workspace Detail embeds the session list with loading, empty, error/retry, and
+permission-aware create states. OWNER, ADMIN, and REVIEWER see creation actions;
+MEMBER and AUDITOR remain read-only. The create form supports RAW_SNIPPET,
+GIT_DIFF, and INTENT_MATCHING with backend-aligned validation and a visible
+synchronous-analysis state. Detail renders Rule and AI Decision Cards with
+textual source labels. AI FALLBACK is a non-fatal outcome and retains Rule
+cards. Voting, reviewer assignment, comments, and session closing remain
+outside this slice.
+
 The React application provides four Team Workspace route patterns:
 
 - `/workspaces`: loading, error, empty, and active-workspace list states.

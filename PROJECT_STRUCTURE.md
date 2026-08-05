@@ -104,6 +104,11 @@ workspace, while Shared rows require one. Do not introduce a parallel
 
 For the frontend, add the corresponding boundary when a feature grows beyond one screen:
 
+- Shared Review Sessions use `features/workspace/WorkspaceSessionsSection.tsx`
+  for the reusable workspace list and dedicated pages for list, create, and
+  detail. Keep role helpers outside component files and keep API contracts in
+  `types.ts`/`lib/api.ts`.
+
 ```text
 frontend/src/features/workspace/
 ├── api.ts

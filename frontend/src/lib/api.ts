@@ -7,9 +7,12 @@ import type {
   AuthResponse,
   CreateWorkspaceRequest,
   CreateWorkspaceInvitationRequest,
+  CreateSharedReviewSessionRequest,
   DecisionStatus,
   MicroDecision,
   PersonalSession,
+  SharedReviewSessionDetail,
+  SharedReviewSessionSummary,
   MyWorkspaceInvitation,
   UpdateWorkspaceMemberRoleRequest,
   WorkspaceDetail,
@@ -228,5 +231,20 @@ export const api = {
     request<WorkspaceInvitation>(
       `/gateway/workspace-invitations/${encodeURIComponent(invitationId)}/reject`,
       { method: 'POST' },
+    ),
+  createSharedReviewSession: (
+    workspaceId: string,
+    payload: CreateSharedReviewSessionRequest,
+  ) => request<SharedReviewSessionDetail>(
+    `${WORKSPACE_API_PREFIX}/${encodeURIComponent(workspaceId)}/sessions`,
+    { method: 'POST', body: JSON.stringify(payload) },
+  ),
+  getSharedReviewSessions: (workspaceId: string) =>
+    request<SharedReviewSessionSummary[]>(
+      `${WORKSPACE_API_PREFIX}/${encodeURIComponent(workspaceId)}/sessions`,
+    ),
+  getSharedReviewSession: (workspaceId: string, sessionId: string) =>
+    request<SharedReviewSessionDetail>(
+      `${WORKSPACE_API_PREFIX}/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}`,
     ),
 }
