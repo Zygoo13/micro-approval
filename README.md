@@ -15,6 +15,8 @@ Micro Approval is a code-review workflow that turns deterministic and AI-assiste
 - End-to-end Workspace Invitation lifecycle for registered or future users,
   with permission-aware administration, `/invitations`, accept/reject/revoke,
   expiration UI, and transactional membership activation.
+- Backend Shared Review Sessions for Raw Snippet, Intent Matching, and Git Diff,
+  reusing the Rule → AI pipeline with workspace-isolated rules and Decision Cards.
 - Flyway-managed MySQL schema.
 
 See [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) for the architectural map, conventions, and module roadmap.
@@ -48,7 +50,7 @@ npm run dev
 Open `http://localhost:3000`.
 
 `POST /api/v1/auth/register` and `POST /api/v1/auth/login` are public. All
-Workspace, Member Management, and Invitation APIs require a valid JWT. Local development
+Workspace, Member Management, Invitation, and Shared Session APIs require a valid JWT. Local development
 accepts both `http://localhost:3000` and `http://127.0.0.1:3000`; override the
 exact deployment origins with `CORS_ALLOWED_ORIGINS` as a comma-separated list.
 

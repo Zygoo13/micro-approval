@@ -26,6 +26,10 @@ public class ReviewSession {
     @Column(name = "workspace_type", nullable = false)
     private WorkspaceType workspaceType;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "workspace_id")
+    private Workspace workspace;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private AnalysisMode mode;

@@ -5,6 +5,8 @@ import com.microapproval.api.entity.ReviewSession;
 import com.microapproval.api.entity.RiskCategory;
 import com.microapproval.api.entity.RiskLevel;
 import com.microapproval.api.entity.RulePattern;
+import com.microapproval.api.entity.Workspace;
+import com.microapproval.api.entity.WorkspaceType;
 import com.microapproval.api.repository.RulePatternRepository;
 import org.junit.jupiter.api.Test;
 
@@ -14,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 
 class RuleEngineServiceTest {
 
@@ -77,6 +80,34 @@ class RuleEngineServiceTest {
         RuleEngineService engine = engineWith(10, configuredRules());
 
         assertTrue(engine.analyze(session("int total = quantity * price;")).isEmpty());
+    }
+
+    @Test
+    void sharedSessionLoadsSystemAndOnlyItsWorkspaceRules() {
+        RulePattern systemRule = destructiveSqlRule();
+        RulePattern workspaceRule = rule(
+                "Workspace policy",
+                5,
+                "WORKSPACE_POLICY",
+                RiskCategory.BUSINESS_LOGIC,
+                RiskLevel.MEDIUM
+        );
+        when(rulePatternRepository.findActiveSystemAndWorkspaceRules("workspace-a"))
+                .thenReturn(List.of(workspaceRule, systemRule));
+        ReviewSession shared = ReviewSession.builder()
+                .workspaceType(WorkspaceType.SHARED)
+                .workspace(Workspace.builder().id("workspace-a").build())
+                .rawContent("WORKSPACE_POLICY; DELETE FROM audit_events")
+                .build();
+
+        List<MicroDecision> decisions = new RuleEngineService(
+                rulePatternRepository,
+                10
+        ).analyze(shared);
+
+        assertEquals(2, decisions.size());
+        assertEquals("Workspace policy", decisions.getFirst().getQuestionText());
+        verify(rulePatternRepository).findActiveSystemAndWorkspaceRules("workspace-a");
     }
 
     private RuleEngineService engineWith(int limit, List<RulePattern> rules) {

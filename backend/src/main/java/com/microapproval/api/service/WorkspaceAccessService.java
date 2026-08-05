@@ -59,6 +59,16 @@ public class WorkspaceAccessService {
         return membership;
     }
 
+    public WorkspaceMember requireSharedSessionCreator(String workspaceId, String userId) {
+        WorkspaceMember membership = requireActiveMembership(workspaceId, userId);
+        if (membership.getRole() != WorkspaceRole.OWNER
+                && membership.getRole() != WorkspaceRole.ADMIN
+                && membership.getRole() != WorkspaceRole.REVIEWER) {
+            throw new ForbiddenOperationException("Bạn không có quyền tạo Shared Review Session");
+        }
+        return membership;
+    }
+
     public void requireCanAssignRole(WorkspaceRole callerRole, WorkspaceRole requestedRole) {
         if (requestedRole == WorkspaceRole.OWNER) {
             throw new InvalidOperationException("Không thể tạo OWNER thứ hai");

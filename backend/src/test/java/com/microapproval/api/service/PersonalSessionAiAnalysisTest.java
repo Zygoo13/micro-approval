@@ -96,7 +96,17 @@ class PersonalSessionAiAnalysisTest {
         AiProviderConfiguration configuration = AiProviderConfiguration.builder().id("ai-1").userId("user-1").enabled(true).build();
         when(aiConfigurationService.activeFor(user)).thenReturn(Optional.of(configuration));
 
-        return new TestContext(new PersonalSessionService(sessions, decisions, users, ruleEngine, properties, aiClient, aiConfigurationService), decisions, aiClient);
+        ReviewAnalysisPipeline pipeline = new ReviewAnalysisPipeline(
+                ruleEngine,
+                properties,
+                aiClient,
+                aiConfigurationService
+        );
+        return new TestContext(
+                new PersonalSessionService(sessions, decisions, users, pipeline),
+                decisions,
+                aiClient
+        );
     }
 
     private CreatePersonalSessionRequest request() {

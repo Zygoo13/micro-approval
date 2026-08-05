@@ -4,6 +4,7 @@ import com.microapproval.api.entity.EngineType;
 import com.microapproval.api.entity.MicroDecision;
 import com.microapproval.api.entity.ReviewSession;
 import com.microapproval.api.entity.RulePattern;
+import com.microapproval.api.entity.WorkspaceType;
 import com.microapproval.api.repository.RulePatternRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -42,7 +43,7 @@ public class RuleEngineService {
     public RuleAnalysisResult analyzeWithRemainingContent(ReviewSession session) {
         List<MicroDecision> decisions = new ArrayList<>();
         List<MatchRange> matchedRanges = new ArrayList<>();
-        for (RulePattern rule : rulePatternRepository.findAllByWorkspaceIdIsNullAndIsActiveTrueOrderByPriorityAscNameAsc()) {
+        for (RulePattern rule : rulesFor(session)) {
             if (decisions.size() >= maxCardsPerSession) {
                 break;
             }
@@ -56,6 +57,16 @@ public class RuleEngineService {
             decisions.get(index).setDisplayOrder(index + 1);
         }
         return new RuleAnalysisResult(decisions, removeMatchedRanges(session.getRawContent(), matchedRanges));
+    }
+
+    private List<RulePattern> rulesFor(ReviewSession session) {
+        if (session.getWorkspaceType() == WorkspaceType.SHARED && session.getWorkspace() != null) {
+            return rulePatternRepository.findActiveSystemAndWorkspaceRules(
+                    session.getWorkspace().getId()
+            );
+        }
+        return rulePatternRepository
+                .findAllByWorkspaceIdIsNullAndIsActiveTrueOrderByPriorityAscNameAsc();
     }
 
     private Optional<RuleMatch> findFirstMatch(RulePattern rule, String source) {

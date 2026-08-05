@@ -30,10 +30,14 @@ direct administration of already registered users, and end-to-end invitations:
 9. OWNER or ADMIN invites an email within their role boundary.
 10. The matching authenticated recipient accepts or rejects the invitation.
 11. Accept creates or reactivates an ACTIVE membership in the same transaction.
+12. OWNER, ADMIN, or REVIEWER creates a Shared Review Session.
+13. The shared Rule → AI pipeline produces Decision Cards using system rules
+    plus rules scoped to that workspace.
+14. Every ACTIVE member can list and read Shared sessions and their cards.
 
-Email delivery, public invitation links, self-leave, ownership transfer, Team
-review sessions, notifications, webhooks, and integrations remain outside these
-slices.
+Email delivery, public invitation links, self-leave, ownership transfer,
+Shared-session frontend, reviewer assignment, Team voting, notifications,
+webhooks, and integrations remain outside these slices.
 
 ## Frontend
 
@@ -120,6 +124,20 @@ a generated `pending_email`. The unique `(workspace_id, pending_email)` index
 allows invitation history while preventing two PENDING invitations for one
 workspace/email pair.
 
+Flyway migration `V9__support_shared_review_sessions.sql` adds nullable
+`review_sessions.workspace_id`, backfills legacy SHARED rows through their
+project, and fails safely if a legacy workspace cannot be inferred. Its foreign
+key, workspace indexes, and CHECK constraint enforce:
+
+```text
+PERSONAL -> workspace_id IS NULL
+SHARED   -> workspace_id IS NOT NULL
+```
+
+V10 upgrades review-session creation/completion timestamps to microsecond
+precision so newest-first ordering remains deterministic for sessions created
+within the same second. Existing Personal rows and Decision Cards are retained.
+
 Workspace names are stored with a maximum of 100 characters. Descriptions are
 validated at 1,000 characters by the API and stored as nullable `TEXT` so a
 legacy description is never truncated. Hibernate remains configured with
@@ -176,6 +194,34 @@ PENDING membership conflicts safely. Invitation and membership changes share
 one transaction and use pessimistic locks; database unique constraints remain
 the final concurrent-write defense.
 
+## Shared Review Sessions
+
+Shared sessions extend the existing `ReviewSession`; no parallel table or
+analysis pipeline exists. Creation accepts the same input vocabulary as
+Personal Workspace: `RAW_SNIPPET`, `GIT_DIFF`, and `INTENT_MATCHING`, using
+`rawContent` plus `promptContent` for intent. `workspaceId` and creator identity
+come exclusively from the path and authenticated principal.
+
+`ReviewAnalysisPipeline` runs configured rules first, removes matched ranges,
+then sends remaining content to the creator's active AI provider configuration.
+Personal sessions load system rules only. Shared sessions load system rules and
+active rules whose `workspace_id` matches the current workspace; rules from any
+other workspace are excluded by the repository query. AI exceptions preserve
+Rule cards and record the existing `FALLBACK` status/error without exposing raw
+provider failures.
+
+Creation stays synchronous and follows the Personal transaction boundary:
+persist session, run Rule/AI, persist cards/status, commit. A no-card session is
+marked `APPROVED`; a session with pending cards remains `PENDING`. AI fallback
+does not roll back Rule results, while Rule/database failures roll back the
+creation transaction. The external AI call therefore occurs inside a database
+transaction; this is accepted for the current synchronous MVP and should be
+revisited with an explicit processing state before asynchronous execution.
+
+Decision Cards continue to reference only `session_id`. The existing single
+`human_decision`/`decided_by` model is unchanged, and Shared voting or vote
+aggregation is not exposed in this slice.
+
 ## API
 
 Authentication registration and login are public:
@@ -206,6 +252,9 @@ All Workspace, Member Management, and Invitation endpoints require a valid JWT:
 | `GET` | `/api/workspace-invitations/mine` | Invitations matching the JWT email |
 | `POST` | `/api/workspace-invitations/{invitationId}/accept` | Accept and activate membership |
 | `POST` | `/api/workspace-invitations/{invitationId}/reject` | Reject without membership creation |
+| `POST` | `/api/workspaces/{workspaceId}/sessions` | Create and synchronously analyze a Shared Review Session; return `201 Created` |
+| `GET` | `/api/workspaces/{workspaceId}/sessions` | ACTIVE-member summaries, newest first |
+| `GET` | `/api/workspaces/{workspaceId}/sessions/{sessionId}` | ACTIVE-member detail with Decision Cards |
 
 Create request:
 
@@ -291,6 +340,22 @@ email, role, effective status, inviter identity, creation/expiry/response times.
 The `mine` response adds workspace name and does not expose another recipient's
 email or any token/hash.
 
+Create Shared Session request:
+
+```json
+{
+  "title": "Review payment validation",
+  "mode": "GIT_DIFF",
+  "rawContent": "diff --git ...",
+  "promptContent": null
+}
+```
+
+`promptContent` is required only for `INTENT_MATCHING`. Create/detail responses
+include session/workspace IDs, `workspaceType=SHARED`, mode, status, AI outcome,
+creator metadata, timestamps, input, and Decision Cards. List uses a summary
+without source content or cards.
+
 ## Authorization rules
 
 `WorkspaceAccessService` is the single membership-access boundary for this slice.
@@ -329,6 +394,20 @@ Non-members receive the existing hidden `404` contract for workspace-scoped
 administration. A wrong recipient also receives `404`, so invitation IDs cannot
 be used to discover another email or workspace.
 
+Shared Session policy:
+
+| Caller | Create | List/detail/cards |
+|---|---:|---:|
+| `OWNER` | Yes | Yes |
+| `ADMIN` | Yes | Yes |
+| `REVIEWER` | Yes | Yes |
+| `MEMBER` | No (`403`) | Yes |
+| `AUDITOR` | No (`403`) | Yes |
+| PENDING/REMOVED/non-member | Hidden (`404`) | Hidden (`404`) |
+
+Detail lookup includes `workspaceId + sessionId + SHARED`, so another
+workspace's session and a Personal session are both hidden as `404`.
+
 Errors use `400` for invalid operations, `403` for an active member without
 sufficient role authority, `404` for hidden/missing workspace resources or an
 unknown registered user, and `409` for membership-state conflicts.
@@ -364,6 +443,14 @@ unique constraints, recipient-only mine/accept/reject, computed expiration,
 410 persistence, revoke policy, processed-state conflicts, REMOVED reactivation,
 single-owner preservation, endpoint authentication, and two concurrent accepts
 producing exactly one membership.
+
+`SharedReviewSessionControllerIntegrationTest` covers OWNER/ADMIN/REVIEWER
+creation, MEMBER/AUDITOR denial, inactive/non-member hiding, all input modes,
+validation, system and workspace rule execution, cross-workspace isolation, AI
+fallback, Decision Card ownership, newest-first list isolation, detail scope,
+Personal exclusion, authentication, and database workspace/type constraints.
+`PersonalSessionAiAnalysisTest` continues to verify the shared pipeline's Rule
+before AI order, token accounting, and fallback behavior for Personal sessions.
 
 Run this slice:
 
@@ -416,9 +503,11 @@ protected route and navigation entry.
 - `service/WorkspaceAccessService.java` and `WorkspaceService.java`.
 - `service/WorkspaceMemberService.java`.
 - `service/WorkspaceInvitationService.java`.
+- `service/ReviewAnalysisPipeline.java` and `SharedReviewSessionService.java`.
 - `controller/WorkspaceController.java` and `WorkspaceMemberController.java`.
 - `controller/WorkspaceInvitationController.java` and
   `MyWorkspaceInvitationController.java`.
+- `controller/SharedReviewSessionController.java`.
 - `dto/CreateWorkspaceRequest.java`, `WorkspaceResponse.java`, and
   `WorkspaceSummaryResponse.java`.
 - `dto/AddWorkspaceMemberRequest.java`,
@@ -427,6 +516,8 @@ protected route and navigation entry.
 - `db/migration/V6__migrate_legacy_teams_to_workspaces.sql`.
 - `db/migration/V7__rename_team_workspace_type_to_shared.sql`.
 - `db/migration/V8__create_workspace_invitations.sql`.
+- `db/migration/V9__support_shared_review_sessions.sql`.
+- `db/migration/V10__increase_review_session_timestamp_precision.sql`.
 - `frontend/src/features/workspace/WorkspaceInvitationsSection.tsx`.
 - `frontend/src/pages/MyInvitationsPage.tsx` and route `/invitations`.
 
@@ -434,10 +525,11 @@ protected route and navigation entry.
 
 Continue in separate vertical slices:
 
-1. Shared Workspace review-session creation and assignment.
-2. Optional email delivery and authenticated invitation links.
-3. Projects owned by a workspace.
-4. Notifications, audit projections, and integrations.
+1. Frontend Shared Review Session list/create/detail.
+2. Reviewer assignment and a separately designed Team voting model.
+3. Optional email delivery and authenticated invitation links.
+4. Projects owned by a workspace.
+5. Notifications, audit projections, and integrations.
 
 All future collaboration features must use `Workspace` and `WorkspaceMember`.
 Do not reintroduce a parallel Team persistence model.

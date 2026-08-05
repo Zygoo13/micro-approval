@@ -60,7 +60,7 @@ micro-approval/
 ### Backend
 
 - `controller` may depend on `dto` and `service`; it must not access repositories directly.
-- `service` owns use cases, authorization decisions, transaction boundaries, and orchestration between Rule and AI engines. `WorkspaceMemberService` owns direct membership lifecycle use cases, `WorkspaceInvitationService` owns invitation state transitions, and `WorkspaceAccessService` is the centralized workspace authorization policy.
+- `service` owns use cases, authorization decisions, transaction boundaries, and orchestration between Rule and AI engines. `WorkspaceMemberService` owns direct membership lifecycle use cases, `WorkspaceInvitationService` owns invitation state transitions, `SharedReviewSessionService` owns workspace-scoped session use cases, and `WorkspaceAccessService` is the centralized workspace authorization policy. `ReviewAnalysisPipeline` is shared by Personal and Shared session creation.
 - `repository` is the only persistence abstraction used by services. Keep query methods named for the business scope they enforce.
 - `entity` contains persistence-backed business state; it must not depend on controllers or DTOs.
 - `dto` is the HTTP contract. Do not return entities from controllers.
@@ -98,6 +98,9 @@ Keep membership HTTP contracts separate from entities: member APIs return
 `WorkspaceMemberResponse`, and mutation requests use dedicated validated DTOs.
 Invitation controllers likewise return DTOs only; invitation expiry and
 membership activation remain one transactional service concern.
+`ReviewSession` is the common Personal/Shared aggregate: Personal rows have no
+workspace, while Shared rows require one. Do not introduce a parallel
+`shared_review_sessions` table or duplicate the Rule/AI analysis workflow.
 
 For the frontend, add the corresponding boundary when a feature grows beyond one screen:
 
