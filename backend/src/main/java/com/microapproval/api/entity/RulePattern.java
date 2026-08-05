@@ -29,8 +29,8 @@ public class RulePattern {
     @Column(length = 36)
     private String id;
 
-    @Column(name = "team_id", length = 36)
-    private String teamId;
+    @Column(name = "workspace_id", length = 36)
+    private String workspaceId;
 
     @Column(nullable = false, length = 100)
     private String name;

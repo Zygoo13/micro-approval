@@ -80,7 +80,7 @@ class RuleEngineServiceTest {
     }
 
     private RuleEngineService engineWith(int limit, List<RulePattern> rules) {
-        when(rulePatternRepository.findAllByTeamIdIsNullAndIsActiveTrueOrderByPriorityAscNameAsc()).thenReturn(rules);
+        when(rulePatternRepository.findAllByWorkspaceIdIsNullAndIsActiveTrueOrderByPriorityAscNameAsc()).thenReturn(rules);
         return new RuleEngineService(rulePatternRepository, limit);
     }
 

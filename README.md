@@ -1,6 +1,6 @@
 # Micro Approval
 
-Micro Approval is a code-review workflow that turns deterministic and AI-assisted findings into individual Decision Cards. The current implementation delivers the Personal Workspace; Team Workspace and integration modules remain planned.
+Micro Approval is a code-review workflow that turns deterministic and AI-assisted findings into individual Decision Cards. The current implementation delivers the Personal Workspace and the first end-to-end slice of Shared Workspace.
 
 ## Current capabilities
 
@@ -9,9 +9,24 @@ Micro Approval is a code-review workflow that turns deterministic and AI-assiste
 - Database-configured Rule Engine, evaluated before AI.
 - Per-user AI configuration for OpenAI or Google Gemini. API keys are encrypted at rest with AES-256-GCM and are never returned to the browser.
 - Decision Cards, one-time approve/reject, review notes, and personal session history.
+- Shared Workspace creation plus active-membership list/detail access in the backend and web UI.
+- Member administration for registered users in the backend and web UI, with
+  OWNER/ADMIN role-aware actions, soft removal, and membership reactivation.
 - Flyway-managed MySQL schema.
 
 See [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) for the architectural map, conventions, and module roadmap.
+See [docs/TEAM_WORKSPACE.md](docs/TEAM_WORKSPACE.md) for the Team Workspace schema, API, access rules, and test scope.
+
+## Collaboration domain
+
+`Workspace` is the only collaboration aggregate. `WorkspaceMember` carries a
+user's role and membership status within that workspace. The former
+`teams`/`team_members` model was the legacy name for the same concept and is
+migrated and removed by Flyway V6.
+
+The historical specification term "Team Workspace" means Shared Workspace; it
+does not represent a separate `Team` entity. Flyway V7 also renames the
+`ReviewSession.workspaceType` discriminator from `TEAM` to `SHARED`.
 
 ## Local development
 
@@ -29,11 +44,18 @@ npm run dev
 
 Open `http://localhost:3000`.
 
+`POST /api/v1/auth/register` and `POST /api/v1/auth/login` are public. All
+Workspace and Member Management APIs require a valid JWT. Local development
+accepts both `http://localhost:3000` and `http://127.0.0.1:3000`; override the
+exact deployment origins with `CORS_ALLOWED_ORIGINS` as a comma-separated list.
+
 ## Server secrets
 
 Never commit production secrets. Configure these values through your deployment secret store:
 
 - `JWT_SECRET`
+- `CORS_ALLOWED_ORIGINS`: exact trusted frontend origins; do not use `*` for a
+  deployed authenticated application.
 - `AI_CREDENTIAL_ENCRYPTION_KEY`: a Base64-encoded 32-byte key used to encrypt users' provider keys.
 - Database variables: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS`.
 

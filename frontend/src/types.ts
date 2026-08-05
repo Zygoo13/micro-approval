@@ -40,3 +40,49 @@ export interface PersonalSession {
 
 export type AiProviderType = 'OPENAI' | 'GOOGLE_GENAI'
 export interface AiConfiguration { configured: boolean; provider: AiProviderType | null; model: string | null; enabled: boolean; keySuffix: string | null; updatedAt: string | null }
+
+export type WorkspaceRole = 'OWNER' | 'ADMIN' | 'REVIEWER' | 'MEMBER' | 'AUDITOR'
+export type WorkspaceMemberRole = WorkspaceRole
+export type WorkspaceMembershipStatus = 'PENDING' | 'ACTIVE' | 'REMOVED'
+
+export interface WorkspaceMember {
+  membershipId: string
+  userId: string
+  email: string
+  displayName: string
+  role: WorkspaceMemberRole
+  status: WorkspaceMembershipStatus
+  joinedAt: string
+}
+
+export interface AddWorkspaceMemberRequest {
+  email: string
+  role: Exclude<WorkspaceMemberRole, 'OWNER'>
+}
+
+export interface UpdateWorkspaceMemberRoleRequest {
+  role: Exclude<WorkspaceMemberRole, 'OWNER'>
+}
+
+export interface CreateWorkspaceRequest {
+  name: string
+  description?: string
+}
+
+export interface WorkspaceSummary {
+  id: string
+  name: string
+  description: string | null
+  ownerId: string
+  currentUserRole: WorkspaceRole
+  createdAt: string
+}
+
+export interface WorkspaceDetail extends WorkspaceSummary {
+  updatedAt: string
+}
+
+export interface ApiProblem {
+  detail?: string
+  errors?: Record<string, string>
+}

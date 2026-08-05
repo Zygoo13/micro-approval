@@ -8,6 +8,18 @@ For future modules, use **feature-first boundaries inside the existing applicati
 
 The canonical business specification is currently maintained at `C:\Users\AD\Desktop\prj new ban chinh\nghiep-vu-micro-approval-v3-final.md`. Before team collaboration or deployment, copy/version that document under `docs/` in a separate documentation-only change so it is available to every contributor.
 
+The canonical collaboration model is:
+
+```text
+Workspace
+└── WorkspaceMember
+```
+
+The historical `Team Workspace` label means Shared Workspace, not a second
+domain aggregate. Flyway V6 migrates and removes the former `teams` and
+`team_members` schema; V7 replaces the session discriminator `TEAM` with
+`SHARED`.
+
 ## Current repository map
 
 ```text
@@ -21,21 +33,24 @@ micro-approval/
 │   │   ├── exception/       # Domain/application errors and HTTP error mapping
 │   │   ├── repository/      # Spring Data persistence access
 │   │   ├── security/        # JWT generation and authentication filter
-│   │   └── service/         # Personal workflow, Rule Engine, AI integration
+│   │   └── service/         # Personal/Workspace workflows, access, Rule and AI engines
 │   ├── src/main/resources/
 │   │   ├── application.yaml # Runtime configuration only; no real secrets
 │   │   └── db/migration/    # Immutable Flyway migrations
 │   └── src/test/java/       # Tests mirroring the production package root
 ├── frontend/
 │   ├── src/
+│   │   ├── features/        # Feature-owned UI sections and focused tests
 │   │   ├── lib/             # HTTP client and presentation labels
 │   │   ├── pages/           # Route-level screens for the current small UI
 │   │   ├── App.tsx          # Route composition and authenticated layout
 │   │   ├── types.ts         # API/UI contract types
-│   │   └── styles.css       # Shared MVP styling
+│   │   ├── styles.css       # Shared MVP styling
+│   │   └── workspace.css    # Team Workspace slice styling
 │   ├── vite.config.ts       # Development proxy only
 │   └── package.json
 ├── docker-compose.yml       # Local MySQL only
+├── docs/                    # Focused module/API documentation
 ├── README.md                # Setup and verification entry point
 └── PROJECT_STRUCTURE.md     # This architectural convention
 ```
@@ -45,7 +60,7 @@ micro-approval/
 ### Backend
 
 - `controller` may depend on `dto` and `service`; it must not access repositories directly.
-- `service` owns use cases, authorization decisions, transaction boundaries, and orchestration between Rule and AI engines.
+- `service` owns use cases, authorization decisions, transaction boundaries, and orchestration between Rule and AI engines. `WorkspaceMemberService` owns membership lifecycle use cases, while `WorkspaceAccessService` is the centralized workspace authorization policy.
 - `repository` is the only persistence abstraction used by services. Keep query methods named for the business scope they enforce.
 - `entity` contains persistence-backed business state; it must not depend on controllers or DTOs.
 - `dto` is the HTTP contract. Do not return entities from controllers.
@@ -61,23 +76,31 @@ micro-approval/
 
 ## Rules for new modules
 
-When a new module has an HTTP endpoint, a use case, and persistence, create a focused feature package rather than adding more generic top-level files. Example for Team Workspace:
+Small vertical slices may continue using the existing layer-first packages, as the
+first Team Workspace slice does. When a module grows into several use cases and
+its own persistence model, move that module in one behavior-preserving change to
+a focused feature package rather than adding more generic top-level files.
+Example for a mature Team Workspace:
 
 ```text
-backend/src/main/java/com/microapproval/api/team/
-├── TeamController.java
-├── TeamService.java
+backend/src/main/java/com/microapproval/api/workspace/
+├── WorkspaceController.java
+├── WorkspaceService.java
 ├── dto/
-├── model/           # Team-owned entities/value objects only
+├── model/           # Workspace-owned entities/value objects only
 └── repository/
 ```
 
-Keep shared entities only when they are genuinely shared. `ReviewSession` and `MicroDecision` are shared foundations for Personal and Team; Team-specific membership, assignment, and role policies belong in `team`.
+Keep shared entities only when they are genuinely shared. `ReviewSession` and
+`MicroDecision` are foundations for Personal and shared Workspace flows.
+Membership, assignment, and role policies belong to the Workspace module.
+Keep membership HTTP contracts separate from entities: member APIs return
+`WorkspaceMemberResponse`, and mutation requests use dedicated validated DTOs.
 
 For the frontend, add the corresponding boundary when a feature grows beyond one screen:
 
 ```text
-frontend/src/features/team/
+frontend/src/features/workspace/
 ├── api.ts
 ├── types.ts
 ├── components/
@@ -86,13 +109,19 @@ frontend/src/features/team/
 
 Route registration remains in `App.tsx` until route count makes a dedicated `routes/` directory useful.
 
+The current Workspace feature boundary contains `WorkspaceMembersSection` and
+its focused tests under `frontend/src/features/workspace/`. Route-level loading
+and workspace metadata remain in `WorkspaceDetailPage`; membership state,
+forms, mutation feedback, and permission-aware presentation belong to the
+feature component.
+
 ## Extension roadmap
 
 | Module | Placement | Initial responsibility |
 |---|---|---|
-| Rule Engine | `rule/` when it gains team rules/admin APIs | Pattern lifecycle, priority, validation, and deterministic findings |
+| Rule Engine | `rule/` when it gains workspace rules/admin APIs | Pattern lifecycle, priority, validation, and deterministic findings |
 | AI Engine | `ai/` when providers/configuration expand | Provider adapters, encrypted credentials, structured-output validation, usage accounting |
-| Team Workspace | `team/` | Teams, membership, roles, projects, assignment policy |
+| Team Workspace | `workspace/` when its use cases outgrow the current layers | Workspaces, membership, roles, projects, assignment policy |
 | Notification | `notification/` | Domain events and in-app delivery; do not couple it directly to controllers |
 | Audit | `audit/` | Read-only projections, audit links, export policy, data redaction |
 | Webhook | `webhook/` | Provider-specific signature verification and translation into application commands |

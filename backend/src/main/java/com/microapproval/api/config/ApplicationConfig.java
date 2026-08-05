@@ -26,7 +26,7 @@ public class ApplicationConfig {
                 .map(user -> org.springframework.security.core.userdetails.User.builder()
                         .username(user.getEmail())
                         .password(user.getPasswordHash()) // Mật khẩu đã được mã hóa trong DB
-                        .authorities("ROLE_USER") // Quyền mặc định, chúng ta sẽ cấu hình động theo TeamMember Role sau
+                        .authorities("ROLE_USER") // Quyền mặc định; role cộng tác được xác định theo WorkspaceMember
                         .build())
                 .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy người dùng với email: " + username));
     }

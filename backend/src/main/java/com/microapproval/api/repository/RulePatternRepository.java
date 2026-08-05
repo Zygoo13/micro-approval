@@ -8,5 +8,5 @@ import java.util.List;
 
 @Repository
 public interface RulePatternRepository extends JpaRepository<RulePattern, String> {
-    List<RulePattern> findAllByTeamIdIsNullAndIsActiveTrueOrderByPriorityAscNameAsc();
+    List<RulePattern> findAllByWorkspaceIdIsNullAndIsActiveTrueOrderByPriorityAscNameAsc();
 }

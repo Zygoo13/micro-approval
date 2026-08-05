@@ -42,7 +42,7 @@ public class RuleEngineService {
     public RuleAnalysisResult analyzeWithRemainingContent(ReviewSession session) {
         List<MicroDecision> decisions = new ArrayList<>();
         List<MatchRange> matchedRanges = new ArrayList<>();
-        for (RulePattern rule : rulePatternRepository.findAllByTeamIdIsNullAndIsActiveTrueOrderByPriorityAscNameAsc()) {
+        for (RulePattern rule : rulePatternRepository.findAllByWorkspaceIdIsNullAndIsActiveTrueOrderByPriorityAscNameAsc()) {
             if (decisions.size() >= maxCardsPerSession) {
                 break;
             }
