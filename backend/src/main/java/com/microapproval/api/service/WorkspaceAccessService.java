@@ -50,6 +50,15 @@ public class WorkspaceAccessService {
         return membership;
     }
 
+    public WorkspaceMember requireOwnerOrAdmin(String workspaceId, String userId) {
+        WorkspaceMember membership = requireActiveMembership(workspaceId, userId);
+        if (membership.getRole() != WorkspaceRole.OWNER
+                && membership.getRole() != WorkspaceRole.ADMIN) {
+            throw new ForbiddenOperationException("Bạn không có quyền quản lý workspace");
+        }
+        return membership;
+    }
+
     public void requireCanAssignRole(WorkspaceRole callerRole, WorkspaceRole requestedRole) {
         if (requestedRole == WorkspaceRole.OWNER) {
             throw new InvalidOperationException("Không thể tạo OWNER thứ hai");

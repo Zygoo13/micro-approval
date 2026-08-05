@@ -143,7 +143,8 @@ nav a:focus-visible,
   grid-template-columns: 1fr;
 }
 
-.members-section {
+.members-section,
+.invitations-section {
   display: grid;
   gap: 1rem;
   scroll-margin-top: 1rem;
@@ -159,39 +160,60 @@ nav a:focus-visible,
   padding: 1rem;
 }
 
+.invitation-form {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(180px, 1fr) auto;
+  align-items: end;
+  gap: 1rem;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  background: #eff6ff;
+  padding: 1rem;
+}
+
+.invitation-form .field-error {
+  grid-column: 1 / -1;
+}
+
 .member-add-form .field-error,
 .member-add-form .form-actions {
   grid-column: 1 / -1;
 }
 
-.member-table-wrap {
+.member-table-wrap,
+.invitation-table-wrap {
   overflow-x: auto;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   background: #fff;
 }
 
-.member-table {
+.member-table,
+.invitation-table {
   width: 100%;
   border-collapse: collapse;
 }
 
 .member-table th,
-.member-table td {
+.member-table td,
+.invitation-table th,
+.invitation-table td {
   padding: .85rem 1rem;
   border-bottom: 1px solid #e2e8f0;
   text-align: left;
   vertical-align: middle;
 }
 
-.member-table th {
+.member-table th,
+.invitation-table th {
   color: #64748b;
   font-size: .78rem;
   text-transform: uppercase;
   letter-spacing: .04em;
 }
 
-.member-table tbody tr:last-child td {
+.member-table tbody tr:last-child td,
+.invitation-table tbody tr:last-child td {
   border-bottom: 0;
 }
 
@@ -213,6 +235,18 @@ nav a:focus-visible,
 
 .member-table .danger {
   padding: .5rem .7rem;
+}
+
+.invitation-table .danger {
+  padding: .5rem .7rem;
+}
+
+.invitation-dates {
+  display: grid;
+  gap: .3rem;
+  color: #475569;
+  font-size: .82rem;
+  white-space: nowrap;
 }
 
 .membership-status {
@@ -237,6 +271,81 @@ nav a:focus-visible,
 .membership-status.removed {
   color: #991b1b;
   background: #fee2e2;
+}
+
+.invitation-status {
+  display: inline-flex;
+  width: max-content;
+  border-radius: 999px;
+  padding: .3rem .58rem;
+  font-size: .75rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.invitation-status.pending {
+  color: #854d0e;
+  background: #fef3c7;
+}
+
+.invitation-status.accepted {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.invitation-status.rejected,
+.invitation-status.revoked {
+  color: #991b1b;
+  background: #fee2e2;
+}
+
+.invitation-status.expired {
+  color: #475569;
+  background: #e2e8f0;
+}
+
+.my-invitation-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.my-invitation-card {
+  display: grid;
+  gap: 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  padding: 1.15rem;
+}
+
+.my-invitation-card h2 {
+  margin: .2rem 0 0;
+}
+
+.invitation-caption,
+.invitation-details dt {
+  color: #64748b;
+  font-size: .78rem;
+  font-weight: 700;
+}
+
+.invitation-details {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 0;
+}
+
+.invitation-details div {
+  display: grid;
+  gap: .3rem;
+}
+
+.invitation-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: #172033;
+  font-weight: 700;
 }
 
 .field-error {
@@ -278,7 +387,13 @@ textarea[aria-invalid="true"] {
     grid-template-columns: 1fr;
   }
 
-  .member-table-wrap {
+  .invitation-form,
+  .invitation-details {
+    grid-template-columns: 1fr;
+  }
+
+  .member-table-wrap,
+  .invitation-table-wrap {
     overflow: visible;
     border: 0;
     background: transparent;
@@ -287,12 +402,17 @@ textarea[aria-invalid="true"] {
   .member-table,
   .member-table tbody,
   .member-table tr,
-  .member-table td {
+  .member-table td,
+  .invitation-table,
+  .invitation-table tbody,
+  .invitation-table tr,
+  .invitation-table td {
     display: block;
     width: 100%;
   }
 
-  .member-table thead {
+  .member-table thead,
+  .invitation-table thead {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -300,7 +420,8 @@ textarea[aria-invalid="true"] {
     clip: rect(0 0 0 0);
   }
 
-  .member-table tr {
+  .member-table tr,
+  .invitation-table tr {
     display: grid;
     gap: .7rem;
     margin-bottom: .75rem;
@@ -311,7 +432,8 @@ textarea[aria-invalid="true"] {
   }
 
   .member-table td,
-  .member-table td:first-child {
+  .member-table td:first-child,
+  .invitation-table td {
     display: grid;
     grid-template-columns: minmax(90px, .6fr) minmax(0, 1.4fr);
     gap: .5rem;
@@ -319,7 +441,8 @@ textarea[aria-invalid="true"] {
     padding: 0;
   }
 
-  .member-table td::before {
+  .member-table td::before,
+  .invitation-table td::before {
     content: attr(data-label);
     color: #64748b;
     font-size: .78rem;

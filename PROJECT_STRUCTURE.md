@@ -60,7 +60,7 @@ micro-approval/
 ### Backend
 
 - `controller` may depend on `dto` and `service`; it must not access repositories directly.
-- `service` owns use cases, authorization decisions, transaction boundaries, and orchestration between Rule and AI engines. `WorkspaceMemberService` owns membership lifecycle use cases, while `WorkspaceAccessService` is the centralized workspace authorization policy.
+- `service` owns use cases, authorization decisions, transaction boundaries, and orchestration between Rule and AI engines. `WorkspaceMemberService` owns direct membership lifecycle use cases, `WorkspaceInvitationService` owns invitation state transitions, and `WorkspaceAccessService` is the centralized workspace authorization policy.
 - `repository` is the only persistence abstraction used by services. Keep query methods named for the business scope they enforce.
 - `entity` contains persistence-backed business state; it must not depend on controllers or DTOs.
 - `dto` is the HTTP contract. Do not return entities from controllers.
@@ -96,6 +96,8 @@ Keep shared entities only when they are genuinely shared. `ReviewSession` and
 Membership, assignment, and role policies belong to the Workspace module.
 Keep membership HTTP contracts separate from entities: member APIs return
 `WorkspaceMemberResponse`, and mutation requests use dedicated validated DTOs.
+Invitation controllers likewise return DTOs only; invitation expiry and
+membership activation remain one transactional service concern.
 
 For the frontend, add the corresponding boundary when a feature grows beyond one screen:
 
@@ -109,11 +111,14 @@ frontend/src/features/workspace/
 
 Route registration remains in `App.tsx` until route count makes a dedicated `routes/` directory useful.
 
-The current Workspace feature boundary contains `WorkspaceMembersSection` and
-its focused tests under `frontend/src/features/workspace/`. Route-level loading
-and workspace metadata remain in `WorkspaceDetailPage`; membership state,
-forms, mutation feedback, and permission-aware presentation belong to the
-feature component.
+The current Workspace feature boundary contains `WorkspaceMembersSection`,
+`WorkspaceInvitationsSection`, and their focused tests under
+`frontend/src/features/workspace/`. Route-level loading and workspace metadata
+remain in `WorkspaceDetailPage`; membership and invitation administration,
+forms, mutation feedback, and permission-aware presentation belong to feature
+components. `MyInvitationsPage` owns the authenticated recipient lifecycle at
+`/invitations` because it spans workspaces rather than belonging to one detail
+page.
 
 ## Extension roadmap
 

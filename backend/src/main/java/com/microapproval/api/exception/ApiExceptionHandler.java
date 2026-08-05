@@ -49,6 +49,11 @@ public class ApiExceptionHandler {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage());
     }
 
+    @ExceptionHandler(GoneException.class)
+    ProblemDetail handleGone(GoneException exception) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.GONE, exception.getMessage());
+    }
+
     @ExceptionHandler(AiCredentialEncryptionUnavailableException.class)
     ProblemDetail handleAiCredentialEncryptionUnavailable(AiCredentialEncryptionUnavailableException exception) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage());

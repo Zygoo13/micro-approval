@@ -44,6 +44,13 @@ export interface AiConfiguration { configured: boolean; provider: AiProviderType
 export type WorkspaceRole = 'OWNER' | 'ADMIN' | 'REVIEWER' | 'MEMBER' | 'AUDITOR'
 export type WorkspaceMemberRole = WorkspaceRole
 export type WorkspaceMembershipStatus = 'PENDING' | 'ACTIVE' | 'REMOVED'
+export type WorkspaceInvitationRole = Exclude<WorkspaceRole, 'OWNER'>
+export type WorkspaceInvitationStatus =
+  | 'PENDING'
+  | 'ACCEPTED'
+  | 'REJECTED'
+  | 'REVOKED'
+  | 'EXPIRED'
 
 export interface WorkspaceMember {
   membershipId: string
@@ -62,6 +69,35 @@ export interface AddWorkspaceMemberRequest {
 
 export interface UpdateWorkspaceMemberRoleRequest {
   role: Exclude<WorkspaceMemberRole, 'OWNER'>
+}
+
+export interface CreateWorkspaceInvitationRequest {
+  email: string
+  role: WorkspaceInvitationRole
+}
+
+export interface WorkspaceInvitation {
+  id: string
+  workspaceId: string
+  email: string
+  role: WorkspaceInvitationRole
+  status: WorkspaceInvitationStatus
+  invitedByUserId: string
+  invitedByDisplayName: string
+  createdAt: string
+  expiresAt: string
+  respondedAt: string | null
+}
+
+export interface MyWorkspaceInvitation {
+  id: string
+  workspaceId: string
+  workspaceName: string
+  role: WorkspaceInvitationRole
+  status: WorkspaceInvitationStatus
+  invitedByDisplayName: string
+  createdAt: string
+  expiresAt: string
 }
 
 export interface CreateWorkspaceRequest {

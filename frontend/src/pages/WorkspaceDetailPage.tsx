@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { ApiError, api } from '../lib/api'
 import type { WorkspaceDetail } from '../types'
 import WorkspaceMembersSection from '../features/workspace/WorkspaceMembersSection'
+import WorkspaceInvitationsSection from '../features/workspace/WorkspaceInvitationsSection'
 
 const roleLabels: Record<WorkspaceDetail['currentUserRole'], string> = {
   OWNER: 'Chủ sở hữu',
@@ -70,6 +71,9 @@ export default function WorkspaceDetailPage() {
     </section>
   }
 
+  const canManageInvitations = workspace.currentUserRole === 'OWNER'
+    || workspace.currentUserRole === 'ADMIN'
+
   return <section className="page-stack">
     <div className="detail-head">
       <div>
@@ -84,6 +88,7 @@ export default function WorkspaceDetailPage() {
     <nav className="workspace-sections" aria-label="Khu vực workspace">
       <a href="#overview">Tổng quan</a>
       <a href="#members">Members</a>
+      {canManageInvitations && <a href="#invitations">Invitations</a>}
       <a href="#team-sessions">Team Sessions</a>
     </nav>
 
@@ -103,6 +108,8 @@ export default function WorkspaceDetailPage() {
     </dl>
 
     <WorkspaceMembersSection workspace={workspace} />
+
+    {canManageInvitations && <WorkspaceInvitationsSection workspace={workspace} />}
 
     <div className="placeholder-grid single">
       <section id="team-sessions" className="placeholder-card">

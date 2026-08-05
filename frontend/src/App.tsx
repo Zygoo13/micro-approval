@@ -4,6 +4,7 @@ import AiSettingsPage from './pages/AiSettingsPage'
 import CreateSessionPage from './pages/CreateSessionPage'
 import CreateWorkspacePage from './pages/CreateWorkspacePage'
 import LoginPage from './pages/LoginPage'
+import MyInvitationsPage from './pages/MyInvitationsPage'
 import RegisterPage from './pages/RegisterPage'
 import SessionDetailPage from './pages/SessionDetailPage'
 import SessionsPage from './pages/SessionsPage'
@@ -27,6 +28,7 @@ function Layout({ children }: { children: React.ReactNode }) {
         <NavLink to="/sessions">Lịch sử</NavLink>
         <NavLink to="/sessions/new">Phân tích mới</NavLink>
         <NavLink to="/workspaces">Workspaces</NavLink>
+        <NavLink to="/invitations">Lời mời của tôi</NavLink>
         <NavLink to="/settings/ai">Thiết lập AI</NavLink>
         <button
           className="link-button"
@@ -64,6 +66,9 @@ export default function App() {
     } />
     <Route path="/workspaces/:workspaceId" element={
       <Protected><Layout><WorkspaceDetailPage /></Layout></Protected>
+    } />
+    <Route path="/invitations" element={
+      <Protected><Layout><MyInvitationsPage /></Layout></Protected>
     } />
     <Route path="/settings/ai" element={
       <Protected><Layout><AiSettingsPage /></Layout></Protected>

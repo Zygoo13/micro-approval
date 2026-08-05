@@ -6,11 +6,14 @@ import type {
   ApiProblem,
   AuthResponse,
   CreateWorkspaceRequest,
+  CreateWorkspaceInvitationRequest,
   DecisionStatus,
   MicroDecision,
   PersonalSession,
+  MyWorkspaceInvitation,
   UpdateWorkspaceMemberRoleRequest,
   WorkspaceDetail,
+  WorkspaceInvitation,
   WorkspaceMember,
   WorkspaceSummary,
 } from '../types'
@@ -78,6 +81,7 @@ function fallbackMessage(status: number): string {
   if (status === 403) return 'Bạn không có quyền thực hiện thao tác này.'
   if (status === 404) return 'Không tìm thấy tài nguyên được yêu cầu.'
   if (status === 409) return 'Dữ liệu đang ở trạng thái xung đột.'
+  if (status === 410) return 'Lời mời đã hết hạn.'
   if (status >= 500) return 'Máy chủ đang gặp sự cố. Vui lòng thử lại sau.'
   return 'Không thể hoàn tất yêu cầu.'
 }
@@ -196,5 +200,33 @@ export const api = {
     request<void>(
       `${WORKSPACE_API_PREFIX}/${encodeURIComponent(workspaceId)}/members/${encodeURIComponent(memberId)}`,
       { method: 'DELETE' },
+    ),
+  getWorkspaceInvitations: (workspaceId: string) =>
+    request<WorkspaceInvitation[]>(
+      `${WORKSPACE_API_PREFIX}/${encodeURIComponent(workspaceId)}/invitations`,
+    ),
+  createWorkspaceInvitation: (
+    workspaceId: string,
+    payload: CreateWorkspaceInvitationRequest,
+  ) => request<WorkspaceInvitation>(
+    `${WORKSPACE_API_PREFIX}/${encodeURIComponent(workspaceId)}/invitations`,
+    { method: 'POST', body: JSON.stringify(payload) },
+  ),
+  revokeWorkspaceInvitation: (workspaceId: string, invitationId: string) =>
+    request<WorkspaceInvitation>(
+      `${WORKSPACE_API_PREFIX}/${encodeURIComponent(workspaceId)}/invitations/${encodeURIComponent(invitationId)}/revoke`,
+      { method: 'POST' },
+    ),
+  getMyWorkspaceInvitations: () =>
+    request<MyWorkspaceInvitation[]>('/gateway/workspace-invitations/mine'),
+  acceptWorkspaceInvitation: (invitationId: string) =>
+    request<WorkspaceInvitation>(
+      `/gateway/workspace-invitations/${encodeURIComponent(invitationId)}/accept`,
+      { method: 'POST' },
+    ),
+  rejectWorkspaceInvitation: (invitationId: string) =>
+    request<WorkspaceInvitation>(
+      `/gateway/workspace-invitations/${encodeURIComponent(invitationId)}/reject`,
+      { method: 'POST' },
     ),
 }

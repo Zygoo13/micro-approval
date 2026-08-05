@@ -12,6 +12,9 @@ Micro Approval is a code-review workflow that turns deterministic and AI-assiste
 - Shared Workspace creation plus active-membership list/detail access in the backend and web UI.
 - Member administration for registered users in the backend and web UI, with
   OWNER/ADMIN role-aware actions, soft removal, and membership reactivation.
+- End-to-end Workspace Invitation lifecycle for registered or future users,
+  with permission-aware administration, `/invitations`, accept/reject/revoke,
+  expiration UI, and transactional membership activation.
 - Flyway-managed MySQL schema.
 
 See [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) for the architectural map, conventions, and module roadmap.
@@ -45,7 +48,7 @@ npm run dev
 Open `http://localhost:3000`.
 
 `POST /api/v1/auth/register` and `POST /api/v1/auth/login` are public. All
-Workspace and Member Management APIs require a valid JWT. Local development
+Workspace, Member Management, and Invitation APIs require a valid JWT. Local development
 accepts both `http://localhost:3000` and `http://127.0.0.1:3000`; override the
 exact deployment origins with `CORS_ALLOWED_ORIGINS` as a comma-separated list.
 
@@ -56,6 +59,7 @@ Never commit production secrets. Configure these values through your deployment 
 - `JWT_SECRET`
 - `CORS_ALLOWED_ORIGINS`: exact trusted frontend origins; do not use `*` for a
   deployed authenticated application.
+- `WORKSPACE_INVITATION_EXPIRATION_DAYS`: invitation lifetime; defaults to 7.
 - `AI_CREDENTIAL_ENCRYPTION_KEY`: a Base64-encoded 32-byte key used to encrypt users' provider keys.
 - Database variables: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS`.
 

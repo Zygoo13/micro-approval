@@ -145,4 +145,26 @@ describe('Workspace detail', () => {
       '/workspaces',
     )
   })
+
+  it('does not expose or request invitation administration for a MEMBER', async () => {
+    vi.spyOn(api, 'getWorkspaceById').mockResolvedValue({
+      ...workspaceDetail,
+      currentUserRole: 'MEMBER',
+    })
+    vi.spyOn(api, 'getWorkspaceMembers').mockResolvedValue([])
+    const getInvitations = vi.spyOn(api, 'getWorkspaceInvitations')
+
+    render(
+      <MemoryRouter initialEntries={['/workspaces/workspace-1']}>
+        <Routes>
+          <Route path="/workspaces/:workspaceId" element={<WorkspaceDetailPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByRole('heading', { name: 'Payments' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Invitations' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Invitations' })).not.toBeInTheDocument()
+    expect(getInvitations).not.toHaveBeenCalled()
+  })
 })
