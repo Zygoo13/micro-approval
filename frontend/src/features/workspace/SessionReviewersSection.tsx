@@ -30,10 +30,14 @@ function byAssignedAt(left: SessionReviewer, right: SessionReviewer) {
 export default function SessionReviewersSection({
   workspace,
   sessionId,
+  closed = false,
+  refreshKey = 0,
   onRosterChanged,
 }: {
   workspace: WorkspaceDetail
   sessionId: string
+  closed?: boolean
+  refreshKey?: number
   onRosterChanged?: () => void
 }) {
   const [reviewers, setReviewers] = useState<SessionReviewer[]>([])
@@ -50,7 +54,8 @@ export default function SessionReviewersSection({
   const [removeTarget, setRemoveTarget] = useState<SessionReviewer>()
   const [removeReason, setRemoveReason] = useState('')
   const [removeReasonError, setRemoveReasonError] = useState('')
-  const canManage = canManageSessionReviewers(workspace)
+  const hasManagePermission = canManageSessionReviewers(workspace)
+  const canManage = hasManagePermission && !closed
   const currentUserEmail = auth.getCurrentUserEmail()?.toLocaleLowerCase()
   const assignControlsDisabled = assigning
     || loading
@@ -86,7 +91,14 @@ export default function SessionReviewersSection({
   useEffect(() => {
     void loadReviewers()
     if (canManage) void loadMembers()
-  }, [canManage, loadMembers, loadReviewers])
+  }, [canManage, loadMembers, loadReviewers, refreshKey])
+
+  useEffect(() => {
+    if (!closed) return
+    setRemoveTarget(undefined)
+    setRemoveReason('')
+    setRemoveReasonError('')
+  }, [closed])
 
   const candidates = useMemo(() => {
     const assignedMembershipIds = new Set(reviewers.map(item => item.workspaceMemberId))
@@ -187,6 +199,10 @@ export default function SessionReviewersSection({
         <p>Reviewer được phân công cho toàn bộ Decision Card của session.</p>
       </div>
     </div>
+
+    {closed && <div className="notice readonly" role="status">
+      Session đã đóng. Reviewer roster hiện ở chế độ chỉ đọc.
+    </div>}
 
     {canManage && <form className="reviewer-assign-form" onSubmit={submitAssign} noValidate>
       <label htmlFor="reviewer-candidate">Reviewer

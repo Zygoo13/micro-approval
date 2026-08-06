@@ -79,6 +79,7 @@ public class TeamVotingService {
         WorkspaceMember callerMembership = workspaceAccessService
                 .requireActiveMembership(workspaceId, caller.getId());
         ReviewSession session = requireSharedSessionForUpdate(workspaceId, sessionId);
+        requireOpen(session);
         MicroDecision card = decisionRepository
                 .findByIdAndSessionIdForUpdate(cardId, sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException(
@@ -251,6 +252,12 @@ public class TeamVotingService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Không tìm thấy Shared Review Session"
                 ));
+    }
+
+    private void requireOpen(ReviewSession session) {
+        if (session.getClosedAt() != null) {
+            throw new ConflictException("Shared Review Session đã đóng; không thể thay đổi vote");
+        }
     }
 
     private User requireUser(String email) {

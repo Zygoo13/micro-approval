@@ -92,6 +92,9 @@ function SessionSummaryRow({
       </time>
     </div>
     <div className="row-status">
+      <span className={`lifecycle-state compact ${session.closed ? 'closed' : 'open'}`}>
+        {session.closed ? 'Closed' : 'Open'}
+      </span>
       <span className={`ai-status ${session.aiAnalysisStatus.toLowerCase()}`}>
         {aiLabel(session.aiAnalysisStatus)}
       </span>

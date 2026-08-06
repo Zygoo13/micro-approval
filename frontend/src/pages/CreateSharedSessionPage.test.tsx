@@ -16,7 +16,9 @@ const created: SharedReviewSessionDetail = {
   title: 'Review', mode: 'RAW_SNIPPET', rawContent: 'delete user', promptContent: null,
   status: 'PENDING', aiAnalysisStatus: 'DISABLED', aiAnalysisError: null,
   aiTokenUsed: 0, createdByUserId: 'owner-1', createdByDisplayName: 'Owner',
-  createdAt: '2026-08-06T02:00:00', completedAt: null, decisions: [],
+  createdAt: '2026-08-06T02:00:00', completedAt: null,
+  closed: false, closedAt: null, closedByUserId: null, closedByDisplayName: null,
+  closeReason: null, lifecycleVersion: 0, decisions: [],
 }
 
 afterEach(() => vi.restoreAllMocks())

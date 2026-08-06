@@ -75,6 +75,7 @@ public class ReviewSessionReviewerService {
         User caller = requireUser(callerEmail);
         workspaceAccessService.requireOwnerOrAdminForUpdate(workspaceId, caller.getId());
         ReviewSession session = requireSharedSessionForUpdate(workspaceId, sessionId);
+        requireOpen(session);
         WorkspaceMember target = workspaceMemberRepository
                 .findWithWorkspaceAndUserByIdForUpdate(workspaceId, request.workspaceMemberId())
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thành viên"));
@@ -99,6 +100,7 @@ public class ReviewSessionReviewerService {
         User caller = requireUser(callerEmail);
         workspaceAccessService.requireOwnerOrAdminForUpdate(workspaceId, caller.getId());
         ReviewSession session = requireSharedSessionForUpdate(workspaceId, sessionId);
+        requireOpen(session);
         ReviewSessionReviewer assignment = reviewerRepository
                 .findByIdAndSessionForUpdate(assignmentId, sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException(
@@ -148,6 +150,11 @@ public class ReviewSessionReviewerService {
                     )
                     .orElse(null);
             if (session == null) {
+                continue;
+            }
+            // A closed session is an immutable historical snapshot. Membership
+            // changes take effect only after the session is reopened.
+            if (session.getClosedAt() != null) {
                 continue;
             }
             ReviewSessionReviewer assignment = reviewerRepository
@@ -281,6 +288,14 @@ public class ReviewSessionReviewerService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Không tìm thấy Shared Review Session"
                 ));
+    }
+
+    private void requireOpen(ReviewSession session) {
+        if (session.getClosedAt() != null) {
+            throw new ConflictException(
+                    "Shared Review Session đã đóng; không thể thay đổi reviewer"
+            );
+        }
     }
 
     private User requireUser(String email) {

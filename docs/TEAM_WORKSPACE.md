@@ -39,8 +39,8 @@ direct administration of already registered users, and end-to-end invitations:
     roster mutation writes a transactional audit event.
 
 Email delivery, public invitation links, self-leave, ownership transfer,
-Team voting, notifications,
-webhooks, and integrations remain outside these slices.
+comments, Audit Timeline, notifications, webhooks, and integrations remain
+outside these slices.
 
 ## Frontend
 
@@ -73,7 +73,16 @@ visible for audit transparency and are explicitly marked as excluded from quorum
 A `409` keeps the form, explains the conflict, and refetches authoritative voting
 state without auto-resubmission. MEMBER/AUDITOR and unassigned eligible roles are
 read-only. Personal Session routes neither render this section nor call its APIs.
-Comments and session closing remain outside this slice.
+
+Shared Session Detail renders the backend-authoritative Open/Closed lifecycle.
+OWNER and ADMIN may close only APPROVED/REJECTED sessions, with an optional
+trimmed reason, and may reopen closed sessions. Closed sessions retain their
+result, closer/time/reason, reviewer roster, votes, notes, and aggregates while
+hiding vote and roster mutations. A lifecycle `409` triggers one authoritative
+detail/vote/reviewer refresh without automatically retrying the mutation.
+REVIEWER, MEMBER, and AUDITOR remain read-only. Personal Session routes do not
+render lifecycle controls or call lifecycle APIs. Comments and Audit Timeline
+remain outside this slice.
 
 The React application provides four Team Workspace route patterns:
 
@@ -188,6 +197,13 @@ Personal cards retain their existing `human_decision` and keep
 `team_decision=NULL`. A unique `(decision_card_id, reviewer_assignment_id)`
 constraint stores one current vote per reviewer/card; optimistic `version` and
 stable pessimistic lock ordering protect updates and aggregate recalculation.
+
+V13 adds authoritative Shared Session lifecycle fields `closed_at`,
+`closed_by_user_id`, `close_reason`, and optimistic `lifecycle_version`, plus
+`SESSION_CLOSED` and `SESSION_REOPENED` audit event types. Existing Personal and
+Shared rows remain open by default; `completed_at` is not backfilled or reused.
+Closed Shared results stay APPROVED/REJECTED and are frozen until OWNER/ADMIN
+reopens the session.
 
 Workspace names are stored with a maximum of 100 characters. Descriptions are
 validated at 1,000 characters by the API and stored as nullable `TEXT` so a
@@ -312,6 +328,16 @@ All Workspace, Member Management, and Invitation endpoints require a valid JWT:
 | `POST` | `/api/workspaces/{workspaceId}/sessions/{sessionId}/reviewers/{reviewerAssignmentId}/remove` | OWNER/ADMIN soft-removes an assignment with a reason; return `200 OK` |
 | `GET` | `/api/workspaces/{workspaceId}/sessions/{sessionId}/votes` | Any ACTIVE member reads reviewer votes, notes, and current aggregates |
 | `PUT` | `/api/workspaces/{workspaceId}/sessions/{sessionId}/cards/{cardId}/vote` | Eligible ASSIGNED reviewer creates or updates their own vote |
+| `POST` | `/api/workspaces/{workspaceId}/sessions/{sessionId}/close` | OWNER/ADMIN closes an APPROVED/REJECTED Shared Session; optional `{ "reason": "..." }` |
+| `POST` | `/api/workspaces/{workspaceId}/sessions/{sessionId}/reopen` | OWNER/ADMIN reopens and recalculates a closed Shared Session; no body |
+
+Close/reopen never changes the result enum to `CLOSED`: close metadata is a
+separate lifecycle dimension returned by Shared detail, summary, voting, and
+lifecycle responses. While `closed=true`, vote and reviewer mutations return
+`409`; reads remain available to every ACTIVE member. Later membership changes
+remain allowed but do not mutate assignments or aggregates in the frozen
+session. Reopen clears current close metadata and recalculates against current
+membership eligibility. Audit events retain the prior close state and reason.
 
 Create request:
 
@@ -620,6 +646,13 @@ create/update/reconfirm semantics, rejection-note validation, authoritative
 responses, and `409` refetch without automatic retry. Shared and Personal detail
 integration tests verify route isolation.
 
+`SharedSessionLifecycleControls.test.tsx` covers open/closed presentation, the
+five-role permission matrix, final-result eligibility, optional reason handling,
+duplicate-submit prevention, close/reopen success and failure, and `409`
+authoritative refresh without retry. Shared detail integration tests verify that
+closing hides vote/reviewer mutations while retaining read models, reopening
+restores eligible controls, and Personal routes remain isolated.
+
 ## Main implementation files
 
 - `entity/Workspace.java`, `entity/WorkspaceMember.java`, and their enums.
@@ -648,16 +681,18 @@ integration tests verify route isolation.
 - `db/migration/V10__increase_review_session_timestamp_precision.sql`.
 - `db/migration/V11__create_review_session_reviewers.sql`.
 - `db/migration/V12__create_team_decision_votes.sql`.
+- `db/migration/V13__support_shared_session_closing.sql`.
 - `frontend/src/features/workspace/WorkspaceInvitationsSection.tsx`.
 - `frontend/src/features/workspace/SessionReviewersSection.tsx`.
 - `frontend/src/features/workspace/TeamVotingSection.tsx`.
+- `frontend/src/features/workspace/SharedSessionLifecycleControls.tsx`.
 - `frontend/src/pages/MyInvitationsPage.tsx` and route `/invitations`.
 
 ## Next Team Workspace work
 
 Continue in separate vertical slices:
 
-1. Session Closing and an append-only Audit Timeline.
+1. Append-only Audit Timeline API/UI for reviewer, vote, close, and reopen events.
 2. Optional email delivery and authenticated invitation links.
 3. Projects owned by a workspace.
 4. Notifications, audit projections, and integrations.

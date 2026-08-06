@@ -27,6 +27,12 @@ const session: SharedReviewSessionSummary = {
   createdByUserId: 'owner-1',
   createdByDisplayName: 'Owner User',
   createdAt: '2026-08-06T02:00:00',
+  closed: false,
+  closedAt: null,
+  closedByUserId: null,
+  closedByDisplayName: null,
+  closeReason: null,
+  lifecycleVersion: 0,
 }
 
 afterEach(() => vi.restoreAllMocks())
@@ -55,10 +61,25 @@ describe('WorkspaceSessionsSection', () => {
     expect(screen.getByText(/Owner User/)).toBeInTheDocument()
     expect(screen.getByText('AI đã phân tích')).toBeInTheDocument()
     expect(screen.queryByText(/\d+ Decision Card/)).not.toBeInTheDocument()
+    expect(screen.getByText('Open')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Payment authorization/ })).toHaveAttribute(
       'href',
       '/workspaces/workspace-1/sessions/session-1',
     )
+  })
+
+  it('renders the lightweight Closed badge from the backend summary contract', async () => {
+    vi.spyOn(api, 'getSharedReviewSessions').mockResolvedValue([{
+      ...session,
+      closed: true,
+      closedAt: '2026-08-06T04:00:00',
+      closedByUserId: 'owner-1',
+      closedByDisplayName: 'Owner User',
+      closeReason: 'Done',
+      lifecycleVersion: 4,
+    }])
+    renderSection('MEMBER')
+    expect(await screen.findByText('Closed')).toBeInTheDocument()
   })
 
   it('renders an error and retries', async () => {

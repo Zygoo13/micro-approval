@@ -5,6 +5,23 @@ export type TeamVoteDecision = 'APPROVED' | 'REJECTED'
 export type TeamDecisionStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
 export type SessionVotingStatus = 'PENDING' | 'IN_REVIEW' | 'APPROVED' | 'REJECTED'
 
+export interface SharedSessionLifecycleState {
+  sessionId: string
+  status: SessionVotingStatus
+  closed: boolean
+  closedAt: string | null
+  closedByUserId: string | null
+  closedByDisplayName: string | null
+  closeReason: string | null
+  lifecycleVersion: number
+}
+
+export interface CloseSharedSessionRequest {
+  reason?: string
+}
+
+export type SharedSessionLifecycleResponse = SharedSessionLifecycleState
+
 export interface AuthResponse {
   token: string
   userId: string
@@ -73,6 +90,12 @@ export interface DecisionCardVoting {
 export interface SessionVoting {
   sessionId: string
   sessionStatus: SessionVotingStatus
+  closed: boolean
+  closedAt: string | null
+  closedByUserId: string | null
+  closedByDisplayName: string | null
+  closeReason: string | null
+  lifecycleVersion: number
   reviewerCount: number
   cards: DecisionCardVoting[]
 }
@@ -101,6 +124,12 @@ export interface SharedReviewSessionSummary {
   createdByUserId: string
   createdByDisplayName: string
   createdAt: string
+  closed: boolean
+  closedAt: string | null
+  closedByUserId: string | null
+  closedByDisplayName: string | null
+  closeReason: string | null
+  lifecycleVersion: number
 }
 
 export interface SharedReviewSessionDetail extends SharedReviewSessionSummary {

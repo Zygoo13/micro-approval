@@ -79,6 +79,21 @@ public class ReviewSession {
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
+    @Column(name = "closed_at")
+    private LocalDateTime closedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "closed_by_user_id")
+    private User closedBy;
+
+    @Column(name = "close_reason", length = 1000)
+    private String closeReason;
+
+    @Version
+    @Column(name = "lifecycle_version", nullable = false)
+    @Builder.Default
+    private Long lifecycleVersion = 0L;
+
     // Quan hệ 1-N với MicroDecision
     @OneToMany(mappedBy = "session", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default

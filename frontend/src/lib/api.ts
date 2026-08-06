@@ -9,11 +9,13 @@ import type {
   CreateWorkspaceRequest,
   CreateWorkspaceInvitationRequest,
   CreateSharedReviewSessionRequest,
+  CloseSharedSessionRequest,
   DecisionStatus,
   MicroDecision,
   PersonalSession,
   SharedReviewSessionDetail,
   SharedReviewSessionSummary,
+  SharedSessionLifecycleResponse,
   MyWorkspaceInvitation,
   RemoveSessionReviewerRequest,
   SessionReviewer,
@@ -251,6 +253,19 @@ export const api = {
   getSharedReviewSession: (workspaceId: string, sessionId: string) =>
     request<SharedReviewSessionDetail>(
       `${WORKSPACE_API_PREFIX}/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}`,
+    ),
+  closeSharedReviewSession: (
+    workspaceId: string,
+    sessionId: string,
+    payload: CloseSharedSessionRequest,
+  ) => request<SharedSessionLifecycleResponse>(
+    `${WORKSPACE_API_PREFIX}/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/close`,
+    { method: 'POST', body: JSON.stringify(payload) },
+  ),
+  reopenSharedReviewSession: (workspaceId: string, sessionId: string) =>
+    request<SharedSessionLifecycleResponse>(
+      `${WORKSPACE_API_PREFIX}/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/reopen`,
+      { method: 'POST' },
     ),
   getSessionReviewers: (workspaceId: string, sessionId: string) =>
     request<SessionReviewer[]>(

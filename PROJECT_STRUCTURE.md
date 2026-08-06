@@ -60,7 +60,7 @@ micro-approval/
 ### Backend
 
 - `controller` may depend on `dto` and `service`; it must not access repositories directly.
-- `service` owns use cases, authorization decisions, transaction boundaries, and orchestration between Rule and AI engines. `WorkspaceMemberService` owns direct membership lifecycle use cases, `WorkspaceInvitationService` owns invitation state transitions, `SharedReviewSessionService` owns workspace-scoped session use cases, `ReviewSessionReviewerService` owns the reviewer roster lifecycle, `TeamVotingService` owns per-reviewer vote mutations/read models, `TeamReviewAggregationService` owns deterministic Shared card/session aggregation, and `WorkspaceAccessService` is the centralized workspace authorization policy. `ReviewAnalysisPipeline` is shared by Personal and Shared session creation.
+- `service` owns use cases, authorization decisions, transaction boundaries, and orchestration between Rule and AI engines. `WorkspaceMemberService` owns direct membership lifecycle use cases, `WorkspaceInvitationService` owns invitation state transitions, `SharedReviewSessionService` owns workspace-scoped session use cases, `SharedReviewSessionLifecycleService` owns close/reopen, `ReviewSessionReviewerService` owns the reviewer roster lifecycle, `TeamVotingService` owns per-reviewer vote mutations/read models, `TeamReviewAggregationService` owns deterministic Shared card/session aggregation, and `WorkspaceAccessService` is the centralized workspace authorization policy. `ReviewAnalysisPipeline` is shared by Personal and Shared session creation.
 - `repository` is the only persistence abstraction used by services. Keep query methods named for the business scope they enforce.
 - `entity` contains persistence-backed business state; it must not depend on controllers or DTOs.
 - `dto` is the HTTP contract. Do not return entities from controllers.
@@ -75,6 +75,9 @@ micro-approval/
 - `features/workspace/TeamVotingSection.tsx` owns the Shared Session voting read/mutation
   UI. It derives My Vote visibility from the current JWT identity, active reviewer
   roster, and workspace role; the backend remains the authorization authority.
+- `features/workspace/SharedSessionLifecycleControls.tsx` owns close/reopen
+  presentation and mutation state. The route page coordinates successful and
+  conflicting mutations with authoritative detail, voting, and reviewer refreshes.
 - Team Voting consumes only backend-provided quorum and aggregate fields. Vote updates
   include the current `version`; a `409` triggers an authoritative refetch without
   automatically resubmitting the user's mutation.
@@ -107,6 +110,10 @@ membership activation remain one transactional service concern.
 `ReviewSession` is the common Personal/Shared aggregate: Personal rows have no
 workspace, while Shared rows require one. Do not introduce a parallel
 `shared_review_sessions` table or duplicate the Rule/AI analysis workflow.
+Shared closing is a separate lifecycle dimension (`closedAt`, `closedBy`,
+`closeReason`, `lifecycleVersion`) and never reuses Personal `completedAt` or
+introduces a CLOSED result status. All new Shared vote/reviewer mutations must
+acquire the session lock and reject a closed session before changing child rows.
 `ReviewSessionReviewer` is an explicit session-level assignment entity backed
 by `WorkspaceMember`; it must not be replaced with `ManyToMany` or the legacy
 single-user `ReviewSession.assignedTo` field. Assignment audit rows are written
@@ -128,6 +135,9 @@ For the frontend, add the corresponding boundary when a feature grows beyond one
   `features/workspace/SessionReviewersSection.tsx`; the route page supplies the
   workspace role and session ID while the component owns roster, candidate,
   conflict, and required-reason removal state.
+- Shared Session close/reopen uses
+  `features/workspace/SharedSessionLifecycleControls.tsx`; do not infer lifecycle
+  state from the voting result or introduce a client-only `CLOSED` status.
 
 ```text
 frontend/src/features/workspace/

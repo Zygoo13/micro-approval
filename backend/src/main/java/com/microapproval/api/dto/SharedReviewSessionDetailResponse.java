@@ -25,6 +25,12 @@ public record SharedReviewSessionDetailResponse(
         String createdByDisplayName,
         LocalDateTime createdAt,
         LocalDateTime completedAt,
+        boolean closed,
+        LocalDateTime closedAt,
+        String closedByUserId,
+        String closedByDisplayName,
+        String closeReason,
+        long lifecycleVersion,
         List<MicroDecisionResponse> decisions
 ) {
     public static SharedReviewSessionDetailResponse from(
@@ -47,6 +53,12 @@ public record SharedReviewSessionDetailResponse(
                 session.getSubmittedBy().getFullName(),
                 session.getCreatedAt(),
                 session.getCompletedAt(),
+                session.getClosedAt() != null,
+                session.getClosedAt(),
+                session.getClosedBy() == null ? null : session.getClosedBy().getId(),
+                session.getClosedBy() == null ? null : session.getClosedBy().getFullName(),
+                session.getCloseReason(),
+                session.getLifecycleVersion(),
                 decisions
         );
     }

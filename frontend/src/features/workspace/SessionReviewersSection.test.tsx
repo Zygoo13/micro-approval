@@ -64,6 +64,32 @@ function renderSection(
 }
 
 describe('SessionReviewersSection roster and permissions', () => {
+  it('keeps a closed roster visible, hides manager mutations and restores them after reopen', async () => {
+    const getReviewers = vi.spyOn(api, 'getSessionReviewers').mockResolvedValue([reviewer])
+    const getMembers = vi.spyOn(api, 'getWorkspaceMembers').mockResolvedValue(members)
+    const view = render(<SessionReviewersSection
+      workspace={workspace('OWNER')}
+      sessionId="session-1"
+      closed
+    />)
+    expect(await screen.findByText('Review User')).toBeInTheDocument()
+    expect(screen.getByText(/Reviewer roster hiện ở chế độ chỉ đọc/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Phân công' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Gỡ reviewer' })).not.toBeInTheDocument()
+    expect(getMembers).not.toHaveBeenCalled()
+
+    view.rerender(<SessionReviewersSection
+      workspace={workspace('OWNER')}
+      sessionId="session-1"
+      closed={false}
+      refreshKey={1}
+    />)
+    expect(await screen.findByRole('button', { name: 'Phân công' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Gỡ reviewer' })).toBeInTheDocument()
+    expect(getMembers).toHaveBeenCalledTimes(1)
+    expect(getReviewers).toHaveBeenCalledTimes(2)
+  })
+
   it('renders loading, empty, reviewer metadata, error and retry states', async () => {
     vi.spyOn(api, 'getSessionReviewers').mockReturnValue(new Promise(() => undefined))
     const loadingView = render(<SessionReviewersSection workspace={workspace('MEMBER')} sessionId="session-1" />)

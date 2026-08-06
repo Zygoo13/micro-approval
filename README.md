@@ -29,6 +29,11 @@ Micro Approval is a code-review workflow that turns deterministic and AI-assiste
 - Frontend Team Voting on Shared Session Detail with transparent vote/note lists,
   backend-authoritative card/session aggregates, assignment-aware My Vote controls,
   stale-vote reconfirmation, and conflict refresh. Personal Sessions remain isolated.
+- Backend Shared Session close/reopen lifecycle for OWNER/ADMIN, with frozen
+  APPROVED/REJECTED results, mutation guards, lifecycle versioning, and
+  transactional SESSION_CLOSED/SESSION_REOPENED audit events. Shared Session
+  Detail provides permission-aware close/reopen controls, closed metadata, and
+  read-only vote/reviewer views; an Audit Timeline API/UI remains pending.
 - Flyway-managed MySQL schema.
 
 See [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) for the architectural map, conventions, and module roadmap.

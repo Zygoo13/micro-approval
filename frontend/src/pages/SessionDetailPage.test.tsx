@@ -26,6 +26,8 @@ describe('SessionDetailPage', () => {
   it('keeps Personal Workspace isolated from Team Voting APIs', async () => {
     vi.spyOn(api, 'getSession').mockResolvedValue(personalSession)
     const getVoting = vi.spyOn(api, 'getSessionVoting')
+    const close = vi.spyOn(api, 'closeSharedReviewSession')
+    const reopen = vi.spyOn(api, 'reopenSharedReviewSession')
 
     render(
       <MemoryRouter initialEntries={['/sessions/personal-session-1']}>
@@ -37,6 +39,9 @@ describe('SessionDetailPage', () => {
 
     expect(await screen.findByRole('heading', { name: 'Personal review' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Team Voting' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Session đang mở')).not.toBeInTheDocument()
     expect(getVoting).not.toHaveBeenCalled()
+    expect(close).not.toHaveBeenCalled()
+    expect(reopen).not.toHaveBeenCalled()
   })
 })

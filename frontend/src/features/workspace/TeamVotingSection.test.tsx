@@ -78,6 +78,12 @@ function voting(
   return {
     sessionId: 'session-1',
     sessionStatus: 'PENDING',
+    closed: false,
+    closedAt: null,
+    closedByUserId: null,
+    closedByDisplayName: null,
+    closeReason: null,
+    lifecycleVersion: 0,
     reviewerCount: 1,
     cards: [{
       cardId: 'card-1',
@@ -185,6 +191,16 @@ describe('TeamVotingSection loading and read states', () => {
 })
 
 describe('TeamVotingSection permission-aware form', () => {
+  it('keeps votes and notes visible but hides My Vote when the session is closed', async () => {
+    renderSection({
+      role: 'REVIEWER',
+      response: voting({ closed: true }, [vote({ note: 'Frozen review note' })]),
+    })
+    expect(await screen.findByText('Ghi chú: Frozen review note')).toBeInTheDocument()
+    expect(screen.getByText(/My Vote ở chế độ chỉ đọc/)).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'My Vote' })).not.toBeInTheDocument()
+  })
+
   it.each<WorkspaceRole>(['OWNER', 'ADMIN', 'REVIEWER'])(
     'shows My Vote to assigned %s',
     async role => {

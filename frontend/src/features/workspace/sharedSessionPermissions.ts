@@ -10,6 +10,10 @@ export function canManageSessionReviewers(workspace: WorkspaceDetail) {
   return workspace.currentUserRole === 'OWNER' || workspace.currentUserRole === 'ADMIN'
 }
 
+export function canManageSharedSessionLifecycle(workspace: WorkspaceDetail) {
+  return workspace.currentUserRole === 'OWNER' || workspace.currentUserRole === 'ADMIN'
+}
+
 export function canSubmitTeamVote(
   workspace: WorkspaceDetail,
   assignment?: SessionReviewer,

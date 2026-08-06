@@ -147,10 +147,142 @@ nav a:focus-visible,
 .invitations-section,
 .workspace-sessions-section,
 .session-reviewers-section,
-.team-voting-section {
+.team-voting-section,
+.session-lifecycle-section {
   display: grid;
   gap: 1rem;
   scroll-margin-top: 1rem;
+}
+
+.session-lifecycle-banner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  background: #eff6ff;
+  padding: 1rem 1.15rem;
+}
+
+.session-lifecycle-banner.closed {
+  border-color: #fbbf24;
+  background: #fffbeb;
+}
+
+.session-lifecycle-banner h2,
+.session-lifecycle-banner p {
+  margin: 0;
+}
+
+.session-lifecycle-banner > div {
+  display: grid;
+  min-width: 0;
+  gap: .45rem;
+}
+
+.lifecycle-state {
+  display: inline-flex;
+  width: max-content;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: .38rem .7rem;
+  font-size: .76rem;
+  font-weight: 800;
+}
+
+.lifecycle-state.open {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.lifecycle-state.closed {
+  color: #92400e;
+  background: #fef3c7;
+}
+
+.lifecycle-state.compact {
+  padding: .28rem .56rem;
+  font-size: .7rem;
+}
+
+.lifecycle-metadata {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .75rem;
+  margin: 0;
+}
+
+.lifecycle-metadata div {
+  display: grid;
+  min-width: 0;
+  gap: .3rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  padding: .85rem 1rem;
+}
+
+.lifecycle-metadata dt {
+  color: #64748b;
+  font-size: .78rem;
+  font-weight: 700;
+}
+
+.lifecycle-metadata dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-weight: 700;
+  white-space: pre-wrap;
+}
+
+.lifecycle-metadata .lifecycle-reason {
+  grid-column: 1 / -1;
+}
+
+.notice.readonly {
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #475569;
+}
+
+.lifecycle-dialog {
+  position: fixed;
+  z-index: 30;
+  inset: 50% auto auto 50%;
+  width: min(560px, calc(100% - 2rem));
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+  transform: translate(-50%, -50%);
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
+  background: #fff;
+  padding: 1.25rem;
+  box-shadow: 0 20px 60px #0f172a40;
+}
+
+.lifecycle-dialog form,
+.lifecycle-dialog > div {
+  display: grid;
+  min-width: 0;
+  gap: 1rem;
+}
+
+.lifecycle-dialog h3,
+.lifecycle-dialog p,
+.lifecycle-dialog ul {
+  margin: 0;
+}
+
+.lifecycle-dialog ul {
+  display: grid;
+  gap: .4rem;
+  padding-left: 1.25rem;
+}
+
+.lifecycle-dialog textarea {
+  max-width: 100%;
+  resize: vertical;
 }
 
 .voting-summary {
@@ -743,7 +875,8 @@ textarea[aria-invalid="true"] {
   .workspace-grid,
   .workspace-metadata,
   .placeholder-grid,
-  .voting-summary {
+  .voting-summary,
+  .lifecycle-metadata {
     grid-template-columns: 1fr;
   }
 
@@ -786,12 +919,18 @@ textarea[aria-invalid="true"] {
   }
 
   .team-voting-card-head,
-  .team-vote-head {
+  .team-vote-head,
+  .session-lifecycle-banner {
     align-items: flex-start;
     flex-direction: column;
   }
 
   .my-vote-form > button {
+    width: 100%;
+  }
+
+  .session-lifecycle-section > button,
+  .lifecycle-dialog .form-actions button {
     width: 100%;
   }
 

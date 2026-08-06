@@ -2,9 +2,10 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ApiError, api } from '../lib/api'
 import { aiLabel, modeLabel, statusLabel } from '../lib/labels'
-import type { SessionVotingStatus, SharedReviewSessionDetail, WorkspaceDetail } from '../types'
+import type { SessionVoting, SessionVotingStatus, SharedReviewSessionDetail, WorkspaceDetail } from '../types'
 import SessionReviewersSection from '../features/workspace/SessionReviewersSection'
 import TeamVotingSection from '../features/workspace/TeamVotingSection'
+import SharedSessionLifecycleControls from '../features/workspace/SharedSessionLifecycleControls'
 
 export default function SharedSessionDetailPage() {
   const { workspaceId, sessionId } = useParams()
@@ -12,7 +13,7 @@ export default function SharedSessionDetailPage() {
   const [session, setSession] = useState<SharedReviewSessionDetail>()
   const [error, setError] = useState<ApiError>()
   const [loading, setLoading] = useState(true)
-  const [votingRefreshKey, setVotingRefreshKey] = useState(0)
+  const [sectionsRefreshKey, setSectionsRefreshKey] = useState(0)
 
   const updateVotingStatus = useCallback((status: SessionVotingStatus) => {
     setSession(current => current && current.status !== status
@@ -20,13 +21,26 @@ export default function SharedSessionDetailPage() {
       : current)
   }, [])
 
-  const load = useCallback(async () => {
+  const updateVotingState = useCallback((voting: SessionVoting) => {
+    setSession(current => current ? {
+      ...current,
+      status: voting.sessionStatus,
+      closed: voting.closed,
+      closedAt: voting.closedAt,
+      closedByUserId: voting.closedByUserId,
+      closedByDisplayName: voting.closedByDisplayName,
+      closeReason: voting.closeReason,
+      lifecycleVersion: voting.lifecycleVersion,
+    } : current)
+  }, [])
+
+  const load = useCallback(async (showLoading = true) => {
     if (!workspaceId || !sessionId) {
       setError(new ApiError('Không tìm thấy Shared Review Session.', 404))
       setLoading(false)
       return
     }
-    setLoading(true)
+    if (showLoading) setLoading(true)
     setError(undefined)
     try {
       const [workspaceResponse, sessionResponse] = await Promise.all([
@@ -40,12 +54,17 @@ export default function SharedSessionDetailPage() {
         ? exception
         : new ApiError('Không thể tải Shared Review Session.', null))
     } finally {
-      setLoading(false)
+      if (showLoading) setLoading(false)
     }
   }, [sessionId, workspaceId])
 
+  const refreshAuthoritativeState = useCallback(async () => {
+    await load(false)
+    setSectionsRefreshKey(current => current + 1)
+  }, [load])
+
   useEffect(() => {
-    void load()
+    void load(true)
   }, [load])
 
   if (loading) return <p className="loading" role="status">Đang tải Shared Review Session…</p>
@@ -80,10 +99,18 @@ export default function SharedSessionDetailPage() {
 
     <AiOutcome session={session} />
 
+    <SharedSessionLifecycleControls
+      workspace={workspace}
+      session={session}
+      onRefresh={refreshAuthoritativeState}
+    />
+
     <SessionReviewersSection
       workspace={workspace}
       sessionId={session.id}
-      onRosterChanged={() => setVotingRefreshKey(current => current + 1)}
+      closed={session.closed}
+      refreshKey={sectionsRefreshKey}
+      onRosterChanged={() => setSectionsRefreshKey(current => current + 1)}
     />
 
     <details className="source-panel">
@@ -97,8 +124,10 @@ export default function SharedSessionDetailPage() {
       workspace={workspace}
       sessionId={session.id}
       decisionCards={session.decisions}
-      refreshKey={votingRefreshKey}
+      closed={session.closed}
+      refreshKey={sectionsRefreshKey}
       onSessionStatusChange={updateVotingStatus}
+      onSessionVotingChange={updateVotingState}
     />
   </section>
 }

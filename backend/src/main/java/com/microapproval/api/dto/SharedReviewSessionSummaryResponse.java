@@ -18,7 +18,13 @@ public record SharedReviewSessionSummaryResponse(
         AiAnalysisStatus aiAnalysisStatus,
         String createdByUserId,
         String createdByDisplayName,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        boolean closed,
+        LocalDateTime closedAt,
+        String closedByUserId,
+        String closedByDisplayName,
+        String closeReason,
+        long lifecycleVersion
 ) {
     public static SharedReviewSessionSummaryResponse from(ReviewSession session) {
         return new SharedReviewSessionSummaryResponse(
@@ -31,7 +37,13 @@ public record SharedReviewSessionSummaryResponse(
                 session.getAiAnalysisStatus(),
                 session.getSubmittedBy().getId(),
                 session.getSubmittedBy().getFullName(),
-                session.getCreatedAt()
+                session.getCreatedAt(),
+                session.getClosedAt() != null,
+                session.getClosedAt(),
+                session.getClosedBy() == null ? null : session.getClosedBy().getId(),
+                session.getClosedBy() == null ? null : session.getClosedBy().getFullName(),
+                session.getCloseReason(),
+                session.getLifecycleVersion()
         );
     }
 }

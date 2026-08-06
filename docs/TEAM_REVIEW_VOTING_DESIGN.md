@@ -1,15 +1,15 @@
 # Team Review: Reviewer Assignment and Voting Design
 
-Status: **Reviewer Assignment and Team Voting backend/frontend implemented; Session Closing and Audit pending**
+Status: **Reviewer Assignment, Team Voting, and Session Closing/Reopening backend/frontend implemented; Audit Timeline pending**
 
 Applies to: Shared Review Sessions only
 
-Reviewed against: application code and Flyway V1–V12
+Reviewed against: application code and Flyway V1–V13
 
 Implementation note: Slice A now provides the reviewer roster APIs,
 `review_session_reviewers`, and minimal append-only assignment audit events.
-V11 intentionally limits audit event types to ASSIGNED, REMOVED, and
-REACTIVATED; vote/close/reopen event types remain future migrations. The roster
+V11 intentionally introduced ASSIGNED, REMOVED, and REACTIVATED audit events;
+V12 added vote events and V13 added SESSION_CLOSED/SESSION_REOPENED. The roster
 endpoint exposes ASSIGNED rows only, remove reason is always required, and both
 new assignment and reactivation return `200 OK` with the authoritative DTO.
 Slice B renders the active roster on Shared Session Detail. OWNER/ADMIN load
@@ -24,8 +24,10 @@ events, the vote list/PUT APIs, unanimous aggregate calculation, and reviewer
 lifecycle hooks. Each vote stores the reviewer assignment's optimistic version.
 Removal/reactivation increments that version, so the old vote remains visible
 for audit with `counted=false` and is excluded until the reviewer confirms it
-again with PUT. No close/reopen state, OWNER override, frontend voting UI, or
-alternative quorum is part of this slice.
+again with PUT. Slice D adds the frontend voting UI. V13 supplies backend
+close/reopen state and Shared Session Detail now provides permission-aware
+lifecycle controls and the closed read-only experience. OWNER override, Audit
+Timeline, and alternative quorum remain outside the implemented scope.
 
 ## 1. Baseline before V11/V12 (historical)
 
@@ -166,9 +168,9 @@ was APPROVED or REJECTED and avoids breaking existing consumers of `status`.
 - OWNER or ADMIN may close a session only when its calculated result is
   APPROVED or REJECTED.
 - Closing requires an optional note and freezes roster/vote mutations.
-- OWNER may reopen a closed session; a non-blank reason is mandatory.
+- OWNER or ADMIN may reopen a closed session; reopen has no request body.
 - Reopen clears close metadata, audits the action, and recalculates current
-  results. ADMIN cannot reopen in the MVP.
+  results from currently eligible assignments and votes.
 - There is no timeout or expiration in the MVP.
 - OWNER override is deferred. If later introduced, only OWNER may override, a
   reason is mandatory, votes are never rewritten, and the override is stored
@@ -210,10 +212,10 @@ carefully preserving its one-time-vote behavior. It provides no immediate user
 value for the first Team Voting slice. A later compatibility migration can move
 Personal if a real shared use case appears.
 
-## 4. Implemented persistence model (close fields deferred)
+## 4. Implemented persistence model
 
-V11 implements reviewer assignment and V12 implements the vote/card aggregate
-structures below. Close/reopen columns remain a future slice.
+V11 implements reviewer assignment, V12 implements the vote/card aggregate,
+and V13 implements the close/reopen lifecycle described below.
 
 ### `review_session_reviewers`
 
@@ -275,13 +277,13 @@ Add nullable `micro_decisions.team_decision` using
 `PENDING|APPROVED|REJECTED`; populate it only for SHARED cards. Keep
 `human_decision` exclusively authoritative for PERSONAL cards.
 
-The following close/reopen columns are deferred and are not part of V12:
+V13 adds these close/reopen columns to `review_sessions`:
 
 ```text
-closed_by VARCHAR(36) NULL
 closed_at TIMESTAMP(6) NULL
-close_note TEXT NULL
-version BIGINT NOT NULL DEFAULT 0
+closed_by_user_id VARCHAR(36) NULL
+close_reason VARCHAR(1000) NULL
+lifecycle_version BIGINT NOT NULL DEFAULT 0
 ```
 
 The existing `status` remains the Shared aggregate result. Team Voting must not
@@ -310,7 +312,8 @@ created_at TIMESTAMP(6)
 ```
 
 Implemented event types are REVIEWER_ASSIGNED, REVIEWER_REMOVED,
-REVIEWER_REACTIVATED, VOTE_CREATED, and VOTE_UPDATED. Vote audit rows reference
+REVIEWER_REACTIVATED, VOTE_CREATED, VOTE_UPDATED, SESSION_CLOSED, and
+SESSION_REOPENED. Vote audit rows reference
 the card and assignment and store old/new decision, note, assignment version,
 and vote version as JSON. They never store secrets or raw source code.
 
@@ -323,7 +326,7 @@ reviewer row and an eligible ACTIVE role.
 | Actor | Assign/remove | View reviewers | Vote/change own | View votes | Close | Reopen | Override |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | OWNER | Yes | Yes | Only if assigned | Yes | Yes | Yes | Deferred; OWNER only |
-| ADMIN | Yes | Yes | Only if assigned | Yes | Yes | No | No |
+| ADMIN | Yes | Yes | Only if assigned | Yes | Yes | Yes | No |
 | REVIEWER | No | Yes | Only if assigned | Yes | No | No | No |
 | MEMBER | No | Yes | No | Yes | No | No | No |
 | AUDITOR | No | Yes | No | Yes | No | No | No |
@@ -445,17 +448,16 @@ decision/missing rejection note, `403` active member but not assigned, hidden
 
 ```http
 POST /api/workspaces/{workspaceId}/sessions/{sessionId}/close
-{ "note": "Ready to merge" }
+{ "reason": "Ready to merge" }
 ```
 
 OWNER/ADMIN: `200` detail response. `409` if unresolved or already closed.
 
 ```http
 POST /api/workspaces/{workspaceId}/sessions/{sessionId}/reopen
-{ "reason": "New evidence requires another review" }
 ```
 
-OWNER only: `200`. `400` blank reason, `409` if already open.
+OWNER/ADMIN: `200` with no request body. `409` if already open.
 
 ### Audit history
 
@@ -484,6 +486,10 @@ cursor. Raw source content and secrets are never returned in event payloads.
 - Workspace-member removal must first lock membership and affected open session
   rows in stable ID order, remove assignments, and recalculate. This avoids a
   vote being accepted after membership removal.
+- For a closed session, later membership role/removal changes do not soft-remove
+  its reviewer assignment or recalculate it. The assignment, votes, card results,
+  and session result remain a frozen historical snapshot. Reopen clears close
+  metadata and recalculates using current membership eligibility.
 - Close locks the session, recalculates from authoritative rows, verifies a
   final result, writes close metadata, and audits. Concurrent late votes either
   commit before close and are included or fail after close with 409.
@@ -511,7 +517,7 @@ cursor. Raw source content and secrets are never returned in event payloads.
    legacy `assigned_to`, zero-card sessions, and all session statuses. Run
    Hibernate validate and both existing regression suites.
 
-## 10. Future frontend workflow
+## 10. Frontend workflow
 
 ```text
 Session Detail
@@ -582,7 +588,7 @@ updates with `409 Conflict`.
 
 - Scope: current votes, My Vote, editable vote, card/session aggregate states,
   409 recovery and read-only views.
-- Out: close/reopen and override.
+- Out: override.
 - Depends on: Slices B and C.
 - Tests: Rule/AI cards, approve/reject validation, change vote, conflicts,
   MEMBER/AUDITOR read-only, responsive and HTTP E2E.
@@ -597,10 +603,13 @@ automatic resubmit. The slice intentionally has no realtime transport, so other
 reviewers' changes appear on reload, roster refresh, successful mutation, or
 conflict recovery.
 
-### Slice E — Session closing and audit
+### Slice E — Session closing backend/frontend (implemented) and Audit Timeline (pending)
 
-- Scope: close/reopen columns and APIs, append-only history endpoint, UI
-  timeline and closed-state controls.
+- Implemented: close/reopen columns and APIs, frozen-result coordination,
+  lifecycle mutation guards, audit writes, concurrency protection,
+  permission-aware controls, closed read-only views, and conflict refresh.
+- Pending: append-only history endpoint and UI timeline. Frontend lifecycle
+  controls and closed read-only states are implemented.
 - Out: override, expiration, notification, webhook.
 - Depends on: Slices A–D.
 - Tests: close/reopen role matrix, unresolved conflict, vote-vs-close race,

@@ -24,6 +24,7 @@ public interface ReviewSessionRepository extends JpaRepository<ReviewSession, St
             SELECT session
             FROM ReviewSession session
             JOIN FETCH session.submittedBy
+            LEFT JOIN FETCH session.closedBy
             WHERE session.workspace.id = :workspaceId
               AND session.workspaceType = :workspaceType
             ORDER BY session.createdAt DESC
@@ -38,6 +39,7 @@ public interface ReviewSessionRepository extends JpaRepository<ReviewSession, St
             FROM ReviewSession session
             JOIN FETCH session.submittedBy
             JOIN FETCH session.workspace
+            LEFT JOIN FETCH session.closedBy
             WHERE session.id = :sessionId
               AND session.workspace.id = :workspaceId
               AND session.workspaceType = :workspaceType

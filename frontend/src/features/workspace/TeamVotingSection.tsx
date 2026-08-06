@@ -38,13 +38,17 @@ export default function TeamVotingSection({
   sessionId,
   decisionCards,
   refreshKey = 0,
+  closed = false,
   onSessionStatusChange,
+  onSessionVotingChange,
 }: {
   workspace: WorkspaceDetail
   sessionId: string
   decisionCards: SharedDecisionCard[]
   refreshKey?: number
+  closed?: boolean
   onSessionStatusChange?: (status: SessionVotingStatus) => void
+  onSessionVotingChange?: (voting: SessionVoting) => void
 }) {
   const [voting, setVoting] = useState<SessionVoting>()
   const [reviewers, setReviewers] = useState<SessionReviewer[]>([])
@@ -64,12 +68,13 @@ export default function TeamVotingSection({
       setVoting(votingResponse)
       setReviewers(reviewerResponse)
       onSessionStatusChange?.(votingResponse.sessionStatus)
+      onSessionVotingChange?.(votingResponse)
     } catch (exception) {
       setLoadError(normalizedError(exception, 'Không thể tải dữ liệu Team Voting.'))
     } finally {
       if (showLoading) setLoading(false)
     }
-  }, [onSessionStatusChange, sessionId, workspace.id])
+  }, [onSessionStatusChange, onSessionVotingChange, sessionId, workspace.id])
 
   useEffect(() => {
     void load()
@@ -81,7 +86,8 @@ export default function TeamVotingSection({
     return reviewers.find(reviewer => reviewer.status === 'ASSIGNED'
       && reviewer.email.toLocaleLowerCase() === currentEmail)
   }, [reviewers])
-  const canVote = canSubmitTeamVote(workspace, currentAssignment)
+  const effectiveClosed = closed || Boolean(voting?.closed)
+  const canVote = !effectiveClosed && canSubmitTeamVote(workspace, currentAssignment)
 
   async function submitVote(cardId: string, request: UpsertTeamVoteRequest) {
     setActionError(undefined)
@@ -90,6 +96,7 @@ export default function TeamVotingSection({
       const response = await api.upsertTeamVote(workspace.id, sessionId, cardId, request)
       setVoting(response)
       onSessionStatusChange?.(response.sessionStatus)
+      onSessionVotingChange?.(response)
       return undefined
     } catch (exception) {
       const error = normalizedError(exception, 'Không thể lưu phiếu đánh giá.')
@@ -116,6 +123,9 @@ export default function TeamVotingSection({
 
     {conflictMessage && <div className="notice warning" role="alert">{conflictMessage}</div>}
     {actionError && <div className="notice error" role="alert">{actionError.message}</div>}
+    {effectiveClosed && <div className="notice readonly" role="status">
+      Session đã đóng. Các phiếu và ghi chú vẫn hiển thị nhưng My Vote ở chế độ chỉ đọc.
+    </div>}
 
     {loading ? <p className="loading" role="status">Đang tải Team Voting…</p>
       : loadError ? <VotingUnavailable error={loadError} retry={load} />

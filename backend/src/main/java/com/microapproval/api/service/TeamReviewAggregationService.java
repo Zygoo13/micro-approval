@@ -36,6 +36,9 @@ public class TeamReviewAggregationService {
     private final DecisionCardVoteRepository voteRepository;
 
     public SessionVotingResponse recalculate(ReviewSession session) {
+        if (session.getClosedAt() != null) {
+            return currentResponse(session);
+        }
         List<MicroDecision> cards = decisionRepository
                 .findAllBySessionIdForUpdate(session.getId());
         VotingData data = loadVotingDataForUpdate(session.getId(), cards);
@@ -186,6 +189,12 @@ public class TeamReviewAggregationService {
         return new SessionVotingResponse(
                 session.getId(),
                 session.getStatus(),
+                session.getClosedAt() != null,
+                session.getClosedAt(),
+                session.getClosedBy() == null ? null : session.getClosedBy().getId(),
+                session.getClosedBy() == null ? null : session.getClosedBy().getFullName(),
+                session.getCloseReason(),
+                session.getLifecycleVersion(),
                 data.eligibleAssignments().size(),
                 cardResponses
         );
