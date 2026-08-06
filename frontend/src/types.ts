@@ -1,6 +1,9 @@
 export type AnalysisMode = 'RAW_SNIPPET' | 'INTENT_MATCHING' | 'GIT_DIFF'
 export type DecisionStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
 export type SessionStatus = 'PENDING' | 'IN_REVIEW' | 'APPROVED' | 'REJECTED' | 'COMPLETED'
+export type TeamVoteDecision = 'APPROVED' | 'REJECTED'
+export type TeamDecisionStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
+export type SessionVotingStatus = 'PENDING' | 'IN_REVIEW' | 'APPROVED' | 'REJECTED'
 
 export interface AuthResponse {
   token: string
@@ -41,7 +44,44 @@ export interface PersonalSession {
 export type SharedReviewSessionMode = AnalysisMode
 export type SharedReviewSessionStatus = SessionStatus
 export type AiAnalysisStatus = 'NOT_REQUESTED' | 'SUCCEEDED' | 'FALLBACK' | 'DISABLED'
-export type SharedDecisionCard = MicroDecision
+export interface SharedDecisionCard extends MicroDecision {
+  teamDecision: TeamDecisionStatus
+}
+
+export interface TeamVote {
+  voteId: string
+  cardId: string
+  reviewerAssignmentId: string
+  reviewerUserId: string
+  reviewerDisplayName: string
+  decision: TeamVoteDecision
+  note: string | null
+  counted: boolean
+  createdAt: string
+  updatedAt: string
+  version: number
+}
+
+export interface DecisionCardVoting {
+  cardId: string
+  teamDecision: TeamDecisionStatus
+  assignedReviewerCount: number
+  validVoteCount: number
+  votes: TeamVote[]
+}
+
+export interface SessionVoting {
+  sessionId: string
+  sessionStatus: SessionVotingStatus
+  reviewerCount: number
+  cards: DecisionCardVoting[]
+}
+
+export interface UpsertTeamVoteRequest {
+  decision: TeamVoteDecision
+  note?: string
+  version?: number
+}
 
 export interface CreateSharedReviewSessionRequest {
   title: string

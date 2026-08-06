@@ -6,6 +6,7 @@ import com.microapproval.api.dto.WorkspaceMemberResponse;
 import com.microapproval.api.entity.MembershipStatus;
 import com.microapproval.api.entity.User;
 import com.microapproval.api.entity.WorkspaceMember;
+import com.microapproval.api.entity.WorkspaceRole;
 import com.microapproval.api.exception.ConflictException;
 import com.microapproval.api.exception.InvalidOperationException;
 import com.microapproval.api.exception.ResourceNotFoundException;
@@ -26,10 +27,13 @@ public class WorkspaceMemberService {
 
     private static final EnumSet<MembershipStatus> VISIBLE_STATUSES =
             EnumSet.of(MembershipStatus.ACTIVE, MembershipStatus.PENDING);
+    private static final EnumSet<WorkspaceRole> REVIEWER_ELIGIBLE_ROLES =
+            EnumSet.of(WorkspaceRole.OWNER, WorkspaceRole.ADMIN, WorkspaceRole.REVIEWER);
 
     private final WorkspaceMemberRepository workspaceMemberRepository;
     private final UserRepository userRepository;
     private final WorkspaceAccessService workspaceAccessService;
+    private final ReviewSessionReviewerService reviewerService;
 
     @Transactional(readOnly = true)
     public List<WorkspaceMemberResponse> getMembers(String workspaceId, String callerEmail) {
@@ -85,8 +89,17 @@ public class WorkspaceMemberService {
                 request.getRole()
         );
 
-        if (target.getRole() != request.getRole()) {
+        WorkspaceRole previousRole = target.getRole();
+        if (previousRole != request.getRole()) {
             target.setRole(request.getRole());
+            if (REVIEWER_ELIGIBLE_ROLES.contains(previousRole)
+                    && !REVIEWER_ELIGIBLE_ROLES.contains(request.getRole())) {
+                reviewerService.removeAssignmentsForEligibilityLoss(
+                        target,
+                        caller,
+                        "Workspace role is no longer eligible for reviewer assignment"
+                );
+            }
         }
         return WorkspaceMemberResponse.from(target);
     }
@@ -111,6 +124,11 @@ public class WorkspaceMemberService {
         );
 
         target.setStatus(MembershipStatus.REMOVED);
+        reviewerService.removeAssignmentsForEligibilityLoss(
+                target,
+                caller,
+                "Workspace membership was removed"
+        );
     }
 
     private WorkspaceMemberResponse reactivateOrReject(

@@ -62,8 +62,18 @@ cards. Shared Session Detail also renders the active reviewer roster for every
 ACTIVE role. OWNER and ADMIN receive candidate-filtered assign controls and a
 keyboard-usable, required-reason removal form; REVIEWER, MEMBER, and AUDITOR see
 the same roster read-only. Candidate options include only ACTIVE OWNER, ADMIN,
-or REVIEWER memberships not already present in the active roster. Voting,
-comments, and session closing remain outside this slice.
+or REVIEWER memberships not already present in the active roster.
+
+Shared Session Detail also contains Team Voting. Every ACTIVE workspace member
+can see card/session aggregates and current reviewer votes/notes. An ASSIGNED
+OWNER, ADMIN, or REVIEWER sees My Vote and can create or replace APPROVED or
+REJECTED; REJECTED requires a trimmed note. Existing updates and stale-vote
+reconfirmation send the latest vote `version`. Votes with `counted=false` remain
+visible for audit transparency and are explicitly marked as excluded from quorum.
+A `409` keeps the form, explains the conflict, and refetches authoritative voting
+state without auto-resubmission. MEMBER/AUDITOR and unassigned eligible roles are
+read-only. Personal Session routes neither render this section nor call its APIs.
+Comments and session closing remain outside this slice.
 
 The React application provides four Team Workspace route patterns:
 
@@ -171,6 +181,14 @@ assign, remove, and reactivate in the same transaction. The legacy
 `review_sessions.assigned_to` column is retained and not backfilled because it
 never had active multi-reviewer semantics.
 
+V12 creates `decision_card_votes`, extends Shared cards with nullable
+`team_decision`, and extends team-review audit events with card references plus
+`VOTE_CREATED`/`VOTE_UPDATED`. Existing Shared cards are backfilled `PENDING`;
+Personal cards retain their existing `human_decision` and keep
+`team_decision=NULL`. A unique `(decision_card_id, reviewer_assignment_id)`
+constraint stores one current vote per reviewer/card; optimistic `version` and
+stable pessimistic lock ordering protect updates and aggregate recalculation.
+
 Workspace names are stored with a maximum of 100 characters. Descriptions are
 validated at 1,000 characters by the API and stored as nullable `TEXT` so a
 legacy description is never truncated. Hibernate remains configured with
@@ -252,8 +270,9 @@ transaction; this is accepted for the current synchronous MVP and should be
 revisited with an explicit processing state before asynchronous execution.
 
 Decision Cards continue to reference only `session_id`. The existing single
-`human_decision`/`decided_by` model is unchanged, and Shared voting or vote
-aggregation is not exposed in this slice.
+`human_decision`/`decided_by` model remains authoritative only for Personal.
+Shared cards expose the separate `teamDecision`; Team votes are stored in
+`decision_card_votes` and never write Personal decision fields.
 
 ## API
 
@@ -291,6 +310,8 @@ All Workspace, Member Management, and Invitation endpoints require a valid JWT:
 | `GET` | `/api/workspaces/{workspaceId}/sessions/{sessionId}/reviewers` | List currently ASSIGNED reviewers for an ACTIVE member |
 | `POST` | `/api/workspaces/{workspaceId}/sessions/{sessionId}/reviewers` | OWNER/ADMIN assigns or reactivates a reviewer; return `200 OK` |
 | `POST` | `/api/workspaces/{workspaceId}/sessions/{sessionId}/reviewers/{reviewerAssignmentId}/remove` | OWNER/ADMIN soft-removes an assignment with a reason; return `200 OK` |
+| `GET` | `/api/workspaces/{workspaceId}/sessions/{sessionId}/votes` | Any ACTIVE member reads reviewer votes, notes, and current aggregates |
+| `PUT` | `/api/workspaces/{workspaceId}/sessions/{sessionId}/cards/{cardId}/vote` | Eligible ASSIGNED reviewer creates or updates their own vote |
 
 Create request:
 
@@ -461,6 +482,25 @@ of at most 1,000 characters. Assignment endpoints are scoped by workspace,
 session, and `SHARED`, so Personal sessions and cross-workspace identifiers are
 hidden as `404`.
 
+Team-voting policy:
+
+| Caller | View votes/notes | Submit/update own vote |
+|---|---:|---:|
+| Assigned ACTIVE `OWNER`/`ADMIN`/`REVIEWER` | Yes | Yes |
+| Unassigned ACTIVE eligible role | Yes | No (`403`) |
+| ACTIVE `MEMBER`/`AUDITOR` | Yes | No (`403`) |
+| PENDING/REMOVED/non-member | Hidden (`404`) | Hidden (`404`) |
+
+`REJECTED` requires a trimmed non-blank note of at most 2,000 characters;
+`APPROVED` accepts an optional note. Create omits `version`; update sends the
+version returned by GET/PUT, and a stale/missing update version returns `409`.
+Quorum includes every currently ASSIGNED, ACTIVE assignment whose role remains
+OWNER/ADMIN/REVIEWER. One valid rejection rejects the card; unanimous approval
+approves it; otherwise it is pending. Session status is derived from all cards,
+with zero cards remaining approved. Reviewer remove/reactivate and membership
+eligibility loss recalculate immediately. Old votes remain visible but do not
+count after assignment reactivation until PUT confirms them again.
+
 Errors use `400` for invalid operations, `403` for an active member without
 sufficient role authority, `404` for hidden/missing workspace resources or an
 unknown registered user, and `409` for membership-state conflicts.
@@ -513,6 +553,16 @@ same-row reactivation, and transactional audit records.
 and verifies one success, one `409` conflict, one assignment row, and one audit
 event.
 
+`TeamVotingControllerIntegrationTest` covers role/membership authorization,
+hidden Personal and cross-scope resources, validation and trimming, vote
+create/update identity and versioning, audit snapshots, multi-card unanimous
+aggregation, reviewer remove/reactivate stale-vote semantics, eligibility loss,
+read access for MEMBER/AUDITOR, and zero-card regression.
+`TeamVotingConcurrencyIntegrationTest` covers simultaneous votes by two
+reviewers, two updates using the same optimistic version, and a vote/remove
+race plus duplicate concurrent vote creation. The complete backend suite
+currently contains 90 passing tests.
+
 Run this slice:
 
 ```powershell
@@ -564,6 +614,12 @@ conflicts, required-reason removal, cancellation, delayed server confirmation,
 and self-remove messaging. Shared and Personal detail tests verify that the
 section is mounted only after a valid Shared Session is loaded.
 
+`TeamVotingSection.test.tsx` covers loading/empty/error/retry, all aggregate
+states, transparent and non-counted votes, the assignment/role permission matrix,
+create/update/reconfirm semantics, rejection-note validation, authoritative
+responses, and `409` refetch without automatic retry. Shared and Personal detail
+integration tests verify route isolation.
+
 ## Main implementation files
 
 - `entity/Workspace.java`, `entity/WorkspaceMember.java`, and their enums.
@@ -573,11 +629,13 @@ section is mounted only after a valid Shared Session is loaded.
 - `service/WorkspaceInvitationService.java`.
 - `service/ReviewAnalysisPipeline.java` and `SharedReviewSessionService.java`.
 - `service/ReviewSessionReviewerService.java`.
+- `service/TeamVotingService.java` and `TeamReviewAggregationService.java`.
 - `controller/WorkspaceController.java` and `WorkspaceMemberController.java`.
 - `controller/WorkspaceInvitationController.java` and
   `MyWorkspaceInvitationController.java`.
 - `controller/SharedReviewSessionController.java`.
 - `controller/ReviewSessionReviewerController.java`.
+- `controller/TeamVotingController.java`.
 - `dto/CreateWorkspaceRequest.java`, `WorkspaceResponse.java`, and
   `WorkspaceSummaryResponse.java`.
 - `dto/AddWorkspaceMemberRequest.java`,
@@ -589,19 +647,20 @@ section is mounted only after a valid Shared Session is loaded.
 - `db/migration/V9__support_shared_review_sessions.sql`.
 - `db/migration/V10__increase_review_session_timestamp_precision.sql`.
 - `db/migration/V11__create_review_session_reviewers.sql`.
+- `db/migration/V12__create_team_decision_votes.sql`.
 - `frontend/src/features/workspace/WorkspaceInvitationsSection.tsx`.
 - `frontend/src/features/workspace/SessionReviewersSection.tsx`.
+- `frontend/src/features/workspace/TeamVotingSection.tsx`.
 - `frontend/src/pages/MyInvitationsPage.tsx` and route `/invitations`.
 
 ## Next Team Workspace work
 
 Continue in separate vertical slices:
 
-1. Team voting backend using the separately designed per-reviewer decision model.
-2. Team voting frontend after its API and aggregate semantics are stable.
-3. Optional email delivery and authenticated invitation links.
-4. Projects owned by a workspace.
-5. Notifications, audit projections, and integrations.
+1. Session Closing and an append-only Audit Timeline.
+2. Optional email delivery and authenticated invitation links.
+3. Projects owned by a workspace.
+4. Notifications, audit projections, and integrations.
 
 All future collaboration features must use `Workspace` and `WorkspaceMember`.
 Do not reintroduce a parallel Team persistence model.

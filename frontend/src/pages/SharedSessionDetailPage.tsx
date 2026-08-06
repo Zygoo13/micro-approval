@@ -2,8 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ApiError, api } from '../lib/api'
 import { aiLabel, modeLabel, statusLabel } from '../lib/labels'
-import type { SharedDecisionCard, SharedReviewSessionDetail, WorkspaceDetail } from '../types'
+import type { SessionVotingStatus, SharedReviewSessionDetail, WorkspaceDetail } from '../types'
 import SessionReviewersSection from '../features/workspace/SessionReviewersSection'
+import TeamVotingSection from '../features/workspace/TeamVotingSection'
 
 export default function SharedSessionDetailPage() {
   const { workspaceId, sessionId } = useParams()
@@ -11,6 +12,13 @@ export default function SharedSessionDetailPage() {
   const [session, setSession] = useState<SharedReviewSessionDetail>()
   const [error, setError] = useState<ApiError>()
   const [loading, setLoading] = useState(true)
+  const [votingRefreshKey, setVotingRefreshKey] = useState(0)
+
+  const updateVotingStatus = useCallback((status: SessionVotingStatus) => {
+    setSession(current => current && current.status !== status
+      ? { ...current, status }
+      : current)
+  }, [])
 
   const load = useCallback(async () => {
     if (!workspaceId || !sessionId) {
@@ -72,7 +80,11 @@ export default function SharedSessionDetailPage() {
 
     <AiOutcome session={session} />
 
-    <SessionReviewersSection workspace={workspace} sessionId={session.id} />
+    <SessionReviewersSection
+      workspace={workspace}
+      sessionId={session.id}
+      onRosterChanged={() => setVotingRefreshKey(current => current + 1)}
+    />
 
     <details className="source-panel">
       <summary>Xem nội dung đã gửi để phân tích</summary>
@@ -81,20 +93,13 @@ export default function SharedSessionDetailPage() {
         <pre className="code">{session.promptContent}</pre></>}
     </details>
 
-    <div className="section-heading">
-      <div>
-        <h2>Decision Cards</h2>
-        <p>{session.decisions.length > 0
-          ? `${session.decisions.length} thẻ được tạo bởi Rule Engine và AI.`
-          : 'Không có Decision Card trong session này.'}</p>
-      </div>
-    </div>
-    {session.decisions.length === 0 ? <div className="empty safe-state">
-      <strong>Không phát hiện rủi ro cần quyết định</strong>
-      <span>Backend đã hoàn tất phân tích và không tạo Decision Card.</span>
-    </div> : <div className="card-list">
-      {session.decisions.map(card => <SharedDecisionCardView key={card.id} card={card} />)}
-    </div>}
+    <TeamVotingSection
+      workspace={workspace}
+      sessionId={session.id}
+      decisionCards={session.decisions}
+      refreshKey={votingRefreshKey}
+      onSessionStatusChange={updateVotingStatus}
+    />
   </section>
 }
 
@@ -110,29 +115,6 @@ function AiOutcome({ session }: { session: SharedReviewSessionDetail }) {
           : 'Session được xử lý bằng Rule Engine theo cấu hình hiện tại.'}</span>
     </div>
   </div>
-}
-
-function SharedDecisionCardView({ card }: { card: SharedDecisionCard }) {
-  const source = card.engineType === 'AI_BASED' ? 'AI' : 'RULE'
-  return <article className={`decision-card shared-decision-card risk-${card.riskLevel.toLowerCase()}`}>
-    <div className="card-meta">
-      <span className={`engine-tag ${card.engineType.toLowerCase()}`}>
-        Nguồn: {source}
-      </span>
-      <span>Mức độ: {card.riskLevel}</span>
-    </div>
-    <p className="decision-category">Danh mục: {card.riskCategory}</p>
-    <h3>{card.questionText}</h3>
-    <pre className="snippet">{card.codeSnippet}</pre>
-    <div className="decision-readonly-status">
-      <span>Quyết định hiện tại</span>
-      <strong className={`status ${card.humanDecision.toLowerCase()}`}>
-        {statusLabel(card.humanDecision)}
-      </strong>
-      {card.reviewerNote && <p>Ghi chú: {card.reviewerNote}</p>}
-      {card.decidedByName && <small>Người xử lý: {card.decidedByName}</small>}
-    </div>
-  </article>
 }
 
 function DetailUnavailable({

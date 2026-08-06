@@ -60,7 +60,7 @@ micro-approval/
 ### Backend
 
 - `controller` may depend on `dto` and `service`; it must not access repositories directly.
-- `service` owns use cases, authorization decisions, transaction boundaries, and orchestration between Rule and AI engines. `WorkspaceMemberService` owns direct membership lifecycle use cases, `WorkspaceInvitationService` owns invitation state transitions, `SharedReviewSessionService` owns workspace-scoped session use cases, `ReviewSessionReviewerService` owns the reviewer roster lifecycle, and `WorkspaceAccessService` is the centralized workspace authorization policy. `ReviewAnalysisPipeline` is shared by Personal and Shared session creation.
+- `service` owns use cases, authorization decisions, transaction boundaries, and orchestration between Rule and AI engines. `WorkspaceMemberService` owns direct membership lifecycle use cases, `WorkspaceInvitationService` owns invitation state transitions, `SharedReviewSessionService` owns workspace-scoped session use cases, `ReviewSessionReviewerService` owns the reviewer roster lifecycle, `TeamVotingService` owns per-reviewer vote mutations/read models, `TeamReviewAggregationService` owns deterministic Shared card/session aggregation, and `WorkspaceAccessService` is the centralized workspace authorization policy. `ReviewAnalysisPipeline` is shared by Personal and Shared session creation.
 - `repository` is the only persistence abstraction used by services. Keep query methods named for the business scope they enforce.
 - `entity` contains persistence-backed business state; it must not depend on controllers or DTOs.
 - `dto` is the HTTP contract. Do not return entities from controllers.
@@ -72,6 +72,12 @@ micro-approval/
 - `pages` contains route-level composition only. When a screen grows reusable controls, move those controls into its feature folder.
 - `lib/api.ts` is the only frontend HTTP boundary; pages must not call `fetch` directly.
 - `types.ts` mirrors public API contracts. Keep provider secrets out of types and browser storage.
+- `features/workspace/TeamVotingSection.tsx` owns the Shared Session voting read/mutation
+  UI. It derives My Vote visibility from the current JWT identity, active reviewer
+  roster, and workspace role; the backend remains the authorization authority.
+- Team Voting consumes only backend-provided quorum and aggregate fields. Vote updates
+  include the current `version`; a `409` triggers an authoritative refetch without
+  automatically resubmitting the user's mutation.
 - Keep Vite proxy configuration development-only; production must inject the API origin through deployment configuration when required.
 
 ## Rules for new modules
@@ -105,6 +111,12 @@ workspace, while Shared rows require one. Do not introduce a parallel
 by `WorkspaceMember`; it must not be replaced with `ManyToMany` or the legacy
 single-user `ReviewSession.assignedTo` field. Assignment audit rows are written
 in the same transaction as roster mutations.
+`DecisionCardVote` is the Team-only mutable current-vote entity. It references
+one `MicroDecision` and one `ReviewSessionReviewer`, while Personal decisions
+remain authoritative in `MicroDecision.humanDecision`. Team vote mutations,
+audit writes, card aggregation, and session aggregation share one transaction.
+Recalculation locks in the stable order session → cards → assignments → votes;
+read-only vote views use fetch-join queries without exposing JPA entities.
 
 For the frontend, add the corresponding boundary when a feature grows beyond one screen:
 

@@ -43,6 +43,7 @@ public class ReviewSessionReviewerService {
     private final WorkspaceMemberRepository workspaceMemberRepository;
     private final UserRepository userRepository;
     private final WorkspaceAccessService workspaceAccessService;
+    private final TeamReviewAggregationService aggregationService;
 
     @Transactional(readOnly = true)
     public List<SessionReviewerResponse> getReviewers(
@@ -79,10 +80,12 @@ public class ReviewSessionReviewerService {
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thành viên"));
         requireEligible(target);
 
-        return reviewerRepository
+        SessionReviewerResponse response = reviewerRepository
                 .findBySessionAndMemberForUpdate(sessionId, target.getId())
                 .map(existing -> reactivate(existing, caller))
                 .orElseGet(() -> createAssignment(session, target, caller));
+        aggregationService.recalculate(session);
+        return response;
     }
 
     @Transactional
@@ -120,7 +123,57 @@ public class ReviewSessionReviewerService {
                 "{\"status\":\"REMOVED\"}",
                 request.reason()
         );
+        aggregationService.recalculate(session);
         return SessionReviewerResponse.from(assignment);
+    }
+
+    /**
+     * Soft-removes every active reviewer assignment when a membership ceases to be
+     * eligible. The existing assignment and votes remain available for audit.
+     */
+    @Transactional
+    public void removeAssignmentsForEligibilityLoss(
+            WorkspaceMember membership,
+            User actor,
+            String reason
+    ) {
+        List<String> sessionIds = reviewerRepository
+                .findAssignedSessionIdsByMembershipId(membership.getId());
+        for (String sessionId : sessionIds) {
+            ReviewSession session = sessionRepository
+                    .findByWorkspaceAndTypeForUpdate(
+                            sessionId,
+                            membership.getWorkspace().getId(),
+                            WorkspaceType.SHARED
+                    )
+                    .orElse(null);
+            if (session == null) {
+                continue;
+            }
+            ReviewSessionReviewer assignment = reviewerRepository
+                    .findBySessionAndMemberForUpdate(sessionId, membership.getId())
+                    .orElse(null);
+            if (assignment == null
+                    || assignment.getStatus() != ReviewSessionReviewerStatus.ASSIGNED) {
+                continue;
+            }
+
+            assignment.setStatus(ReviewSessionReviewerStatus.REMOVED);
+            assignment.setRemovedAt(LocalDateTime.now());
+            assignment.setRemovedBy(actor);
+            assignment.setRemovalReason(reason);
+            reviewerRepository.saveAndFlush(assignment);
+            appendAudit(
+                    session,
+                    actor,
+                    assignment,
+                    TeamReviewAuditEventType.REVIEWER_REMOVED,
+                    "{\"status\":\"ASSIGNED\"}",
+                    "{\"status\":\"REMOVED\"}",
+                    reason
+            );
+            aggregationService.recalculate(session);
+        }
     }
 
     private SessionReviewerResponse createAssignment(

@@ -146,10 +146,172 @@ nav a:focus-visible,
 .members-section,
 .invitations-section,
 .workspace-sessions-section,
-.session-reviewers-section {
+.session-reviewers-section,
+.team-voting-section {
   display: grid;
   gap: 1rem;
   scroll-margin-top: 1rem;
+}
+
+.voting-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 0;
+}
+
+.voting-summary div {
+  display: grid;
+  gap: .35rem;
+  min-width: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  padding: 1rem;
+}
+
+.voting-summary dt,
+.team-vote-time {
+  color: #64748b;
+  font-size: .8rem;
+}
+
+.voting-summary dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-weight: 800;
+}
+
+.team-voting-card-list,
+.team-vote-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.team-voting-card {
+  display: grid;
+  min-width: 0;
+  gap: 1rem;
+  border: 1px solid #e2e8f0;
+  border-left-width: 4px;
+  border-radius: 12px;
+  background: #fff;
+  padding: 1.15rem;
+}
+
+.team-voting-card.risk-low {
+  border-left-color: #22c55e;
+}
+
+.team-voting-card.risk-medium {
+  border-left-color: #f59e0b;
+}
+
+.team-voting-card.risk-high {
+  border-left-color: #dc2626;
+}
+
+.team-voting-card-head,
+.team-vote-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.team-voting-card-head h3 {
+  margin-bottom: 0;
+  overflow-wrap: anywhere;
+}
+
+.quorum-summary {
+  margin: 0;
+  color: #475569;
+}
+
+.team-vote {
+  display: grid;
+  min-width: 0;
+  gap: .65rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #f8fafc;
+  padding: .9rem;
+}
+
+.team-vote.stale {
+  border-color: #f59e0b;
+  background: #fffbeb;
+}
+
+.team-vote-note {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.team-vote-time {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem 1rem;
+}
+
+.stale-vote-label {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .45rem .75rem;
+  color: #92400e;
+  font-size: .85rem;
+}
+
+.my-vote-form {
+  display: grid;
+  gap: 1rem;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  background: #eff6ff;
+  padding: 1rem;
+}
+
+.my-vote-form h4,
+.my-vote-form p {
+  margin: 0;
+}
+
+.my-vote-form fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem 1.25rem;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.my-vote-form fieldset label {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: .45rem;
+}
+
+.my-vote-form input[type="radio"] {
+  width: auto;
+}
+
+.my-vote-form > button {
+  width: max-content;
+}
+
+.empty.compact {
+  min-height: auto;
+  padding: .9rem;
+}
+
+.notice.warning {
+  border: 1px solid #fde68a;
+  background: #fffbeb;
+  color: #92400e;
 }
 
 .reviewer-assign-form {
@@ -555,9 +717,33 @@ textarea[aria-invalid="true"] {
 }
 
 @media (max-width: 720px) {
+  body {
+    min-width: 0;
+  }
+
+  .app-shell,
+  .page-stack,
+  .detail-head,
+  .detail-head > div,
+  .team-voting-section {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  nav {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  h1,
+  .back-link {
+    overflow-wrap: anywhere;
+  }
+
   .workspace-grid,
   .workspace-metadata,
-  .placeholder-grid {
+  .placeholder-grid,
+  .voting-summary {
     grid-template-columns: 1fr;
   }
 
@@ -596,6 +782,16 @@ textarea[aria-invalid="true"] {
 
   .reviewer-assign-form button,
   .reviewer-card > button {
+    width: 100%;
+  }
+
+  .team-voting-card-head,
+  .team-vote-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .my-vote-form > button {
     width: 100%;
   }
 

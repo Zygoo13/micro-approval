@@ -30,9 +30,11 @@ function byAssignedAt(left: SessionReviewer, right: SessionReviewer) {
 export default function SessionReviewersSection({
   workspace,
   sessionId,
+  onRosterChanged,
 }: {
   workspace: WorkspaceDetail
   sessionId: string
+  onRosterChanged?: () => void
 }) {
   const [reviewers, setReviewers] = useState<SessionReviewer[]>([])
   const [members, setMembers] = useState<WorkspaceMember[]>([])
@@ -113,6 +115,7 @@ export default function SessionReviewersSection({
         assignment,
       ].sort(byAssignedAt))
       setSelectedMemberId('')
+      onRosterChanged?.()
     } catch (exception) {
       const error = normalizedError(exception, 'Không thể phân công reviewer.')
       setActionError(error)
@@ -163,6 +166,7 @@ export default function SessionReviewersSection({
       ))
       setRemoveTarget(undefined)
       setRemoveReason('')
+      onRosterChanged?.()
     } catch (exception) {
       const error = normalizedError(exception, 'Không thể gỡ reviewer.')
       setActionError(error)

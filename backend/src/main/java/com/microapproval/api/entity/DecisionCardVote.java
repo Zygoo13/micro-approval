@@ -9,7 +9,9 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -20,61 +22,60 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "team_review_audit_events")
+@Table(name = "decision_card_votes")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class TeamReviewAuditEvent {
+public class DecisionCardVote {
 
     @Id
     @Column(length = 36)
     private String id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "session_id", nullable = false)
-    private ReviewSession session;
-
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "actor_user_id", nullable = false)
-    private User actor;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "event_type", nullable = false)
-    private TeamReviewAuditEventType eventType;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "target_user_id")
-    private User targetUser;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "target_assignment_id")
-    private ReviewSessionReviewer targetAssignment;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "decision_card_id")
+    @JoinColumn(name = "decision_card_id", nullable = false)
     private MicroDecision decisionCard;
 
-    @Column(name = "old_value_json", columnDefinition = "TEXT")
-    private String oldValueJson;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "reviewer_assignment_id", nullable = false)
+    private ReviewSessionReviewer reviewerAssignment;
 
-    @Column(name = "new_value_json", columnDefinition = "TEXT")
-    private String newValueJson;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private TeamVoteDecision decision;
 
-    @Column(length = 1000)
-    private String reason;
+    @Column(length = 2000)
+    private String note;
+
+    @Column(name = "assignment_version", nullable = false)
+    private Long assignmentVersion;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+
+    @Version
+    @Column(nullable = false)
+    private Long version;
 
     @PrePersist
     protected void onCreate() {
         if (id == null) {
             id = UUID.randomUUID().toString();
         }
+        LocalDateTime now = LocalDateTime.now();
         if (createdAt == null) {
-            createdAt = LocalDateTime.now();
+            createdAt = now;
         }
+        updatedAt = now;
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
     }
 }

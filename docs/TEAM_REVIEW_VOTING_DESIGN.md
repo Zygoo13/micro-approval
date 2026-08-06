@@ -1,10 +1,10 @@
 # Team Review: Reviewer Assignment and Voting Design
 
-Status: **Reviewer Assignment backend and frontend implemented; Team Voting not implemented**
+Status: **Reviewer Assignment and Team Voting backend/frontend implemented; Session Closing and Audit pending**
 
 Applies to: Shared Review Sessions only
 
-Reviewed against: application code and Flyway V1–V11
+Reviewed against: application code and Flyway V1–V12
 
 Implementation note: Slice A now provides the reviewer roster APIs,
 `review_session_reviewers`, and minimal append-only assignment audit events.
@@ -18,7 +18,16 @@ roles remain read-only. The UI requires a removal reason, preserves rows until
 the server succeeds, and refreshes after stale `404`/`409` responses. Personal
 Session routes do not mount the reviewer feature.
 
-## 1. Current system
+Slice C is implemented by V12 and the Team Voting backend. It adds
+`decision_card_votes`, nullable `micro_decisions.team_decision`, vote audit
+events, the vote list/PUT APIs, unanimous aggregate calculation, and reviewer
+lifecycle hooks. Each vote stores the reviewer assignment's optimistic version.
+Removal/reactivation increments that version, so the old vote remains visible
+for audit with `counted=false` and is excluded until the reviewer confirms it
+again with PUT. No close/reopen state, OWNER override, frontend voting UI, or
+alternative quorum is part of this slice.
+
+## 1. Baseline before V11/V12 (historical)
 
 ### Personal decision model
 
@@ -201,10 +210,10 @@ carefully preserving its one-time-vote behavior. It provides no immediate user
 value for the first Team Voting slice. A later compatibility migration can move
 Personal if a real shared use case appears.
 
-## 4. Proposed persistence model
+## 4. Implemented persistence model (close fields deferred)
 
-No migration is created by this design task. A future migration should add the
-following structures.
+V11 implements reviewer assignment and V12 implements the vote/card aggregate
+structures below. Close/reopen columns remain a future slice.
 
 ### `review_session_reviewers`
 
@@ -244,9 +253,10 @@ vote coverage and changes when cards or roster change.
 | `decision_card_id VARCHAR(36)` | `micro_decisions.id` |
 | `reviewer_assignment_id VARCHAR(36)` | Session reviewer identity |
 | `decision ENUM('APPROVED','REJECTED')` | Current vote |
-| `note TEXT NULL` | Required for REJECTED |
+| `note VARCHAR(2000) NULL` | Required for REJECTED |
 | `created_at TIMESTAMP(6)` | First vote |
 | `updated_at TIMESTAMP(6)` | Last replacement |
+| `assignment_version BIGINT NOT NULL` | Eligibility generation captured at vote time |
 | `version BIGINT NOT NULL` | Optimistic concurrency/ETag source |
 
 Constraints and indexes:
@@ -254,8 +264,8 @@ Constraints and indexes:
 - `UNIQUE(decision_card_id, reviewer_assignment_id)`.
 - FK card → `micro_decisions` with `ON DELETE CASCADE`.
 - FK assignment → `review_session_reviewers` with `ON DELETE RESTRICT`.
-- index `(reviewer_assignment_id, decision_card_id)` and
-  `(decision_card_id, decision)`.
+- indexes `decision_card_id`, `reviewer_assignment_id`, `decision`, and
+  `(decision_card_id, decision)`; the unique key also covers card/assignment.
 - service invariant: card and assignment belong to the same session.
 - CHECK or service validation: REJECTED requires a trimmed non-empty note.
 
@@ -265,7 +275,7 @@ Add nullable `micro_decisions.team_decision` using
 `PENDING|APPROVED|REJECTED`; populate it only for SHARED cards. Keep
 `human_decision` exclusively authoritative for PERSONAL cards.
 
-Add to `review_sessions`:
+The following close/reopen columns are deferred and are not part of V12:
 
 ```text
 closed_by VARCHAR(36) NULL
@@ -287,24 +297,22 @@ An append-only table is required because `audit_links` is unrelated:
 
 ```text
 id
-workspace_id
 session_id
-decision_card_id NULL
 actor_user_id
-subject_user_id NULL
 event_type
+target_user_id NULL
+target_assignment_id NULL
+decision_card_id NULL
 old_value_json NULL
 new_value_json NULL
 reason NULL
-occurred_at TIMESTAMP(6)
+created_at TIMESTAMP(6)
 ```
 
-Event types initially include REVIEWER_ASSIGNED, REVIEWER_REMOVED, VOTE_CAST,
-VOTE_CHANGED, SESSION_CLOSED, and SESSION_REOPENED. Store identifiers and
-display-safe snapshots, never secrets or raw source code. Use FK session
-`ON DELETE RESTRICT` so review history prevents hard deletion; future Shared
-deletion should archive instead. Index session/time, actor/time, card/time, and
-event type/time.
+Implemented event types are REVIEWER_ASSIGNED, REVIEWER_REMOVED,
+REVIEWER_REACTIVATED, VOTE_CREATED, and VOTE_UPDATED. Vote audit rows reference
+the card and assignment and store old/new decision, note, assignment version,
+and vote version as JSON. They never store secrets or raw source code.
 
 ## 5. Authorization matrix
 
@@ -423,13 +431,13 @@ unbounded response.
 ```http
 PUT /api/workspaces/{workspaceId}/sessions/{sessionId}/cards/{cardId}/vote
 Content-Type: application/json
-If-Match: "vote-version"
 
-{ "decision": "APPROVED", "note": null }
+{ "decision": "APPROVED", "note": null, "version": 3 }
 ```
 
 Assigned reviewer: `200` with updated own vote, card result, session status,
-and new version. Repeating the same representation is idempotent. `400` invalid
+and new version. `version` is omitted for the first vote and required for an
+update/reconfirmation. Repeating the same representation is idempotent. `400` invalid
 decision/missing rejection note, `403` active member but not assigned, hidden
 `404`, `409` removed assignment/closed session/stale version.
 
@@ -464,7 +472,7 @@ cursor. Raw source content and secrets are never returned in event payloads.
   maps duplicate-key races to 409. Lock the session row before checking closed
   state and reactivating/removing an assignment.
 - Vote PUT locks the session, target card, and reviewer-assignment rows in a
-  consistent order. The vote row uses a version/If-Match token to prevent two
+  consistent order. The vote row uses a version token to prevent two
   tabs silently overwriting each other.
 - Current vote write, audit append, card recalculation, and session
   recalculation occur in one transaction.
@@ -553,7 +561,7 @@ Session Detail
 - Tests: five-role UI matrix, add/remove/reactivate, stale role, responsive.
 - Risk: DTO freshness after concurrent roster changes.
 
-### Slice C — Team Voting backend
+### Slice C — Team Voting backend (implemented)
 
 - Scope: vote/current history persistence, PUT vote, vote list, unanimous
   aggregation, materialized card/session results, locks/version conflicts.
@@ -563,7 +571,14 @@ Session Detail
   concurrent same-reviewer requests, roster/vote race, Personal regression.
 - Risk: lock ordering and aggregate correctness.
 
-### Slice D — Team Voting frontend
+Implementation resolves this risk by serializing mutations on the Shared
+session, then locking cards, assignments, and votes in stable order. Aggregate
+queries use locking current reads so MySQL `REPEATABLE_READ` cannot overwrite a
+newer concurrent aggregate with a stale snapshot. The unique card/assignment
+constraint is the final duplicate-create defense; vote `version` rejects stale
+updates with `409 Conflict`.
+
+### Slice D — Team Voting frontend (implemented)
 
 - Scope: current votes, My Vote, editable vote, card/session aggregate states,
   409 recovery and read-only views.
@@ -572,6 +587,15 @@ Session Detail
 - Tests: Rule/AI cards, approve/reject validation, change vote, conflicts,
   MEMBER/AUDITOR read-only, responsive and HTTP E2E.
 - Risk: stale aggregate display after another reviewer votes.
+
+The frontend renders backend-authoritative aggregates and all current votes,
+including `counted=false` audit-visible votes. My Vote is shown only when JWT
+identity matches an ASSIGNED roster entry and the current workspace role is
+OWNER, ADMIN, or REVIEWER. Update/reconfirm requests carry the current vote
+`version`; `409 Conflict` displays a targeted message and refetches without an
+automatic resubmit. The slice intentionally has no realtime transport, so other
+reviewers' changes appear on reload, roster refresh, successful mutation, or
+conflict recovery.
 
 ### Slice E — Session closing and audit
 

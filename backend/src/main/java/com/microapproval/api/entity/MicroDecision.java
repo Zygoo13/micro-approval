@@ -48,6 +48,10 @@ public class MicroDecision {
     @Column(name = "human_decision", nullable = false)
     private DecisionStatus humanDecision;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "team_decision")
+    private TeamDecisionStatus teamDecision;
+
     @Lob
     @Column(name = "reviewer_note", columnDefinition = "TEXT")
     private String reviewerNote;
@@ -69,6 +73,11 @@ public class MicroDecision {
         }
         if (this.humanDecision == null) {
             this.humanDecision = DecisionStatus.PENDING;
+        }
+        if (this.teamDecision == null
+                && this.session != null
+                && this.session.getWorkspaceType() == WorkspaceType.SHARED) {
+            this.teamDecision = TeamDecisionStatus.PENDING;
         }
         if (this.isAiBypassed == null) {
             this.isAiBypassed = false;

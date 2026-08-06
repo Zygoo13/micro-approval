@@ -17,6 +17,8 @@ import type {
   MyWorkspaceInvitation,
   RemoveSessionReviewerRequest,
   SessionReviewer,
+  SessionVoting,
+  UpsertTeamVoteRequest,
   UpdateWorkspaceMemberRoleRequest,
   WorkspaceDetail,
   WorkspaceInvitation,
@@ -270,5 +272,18 @@ export const api = {
   ) => request<SessionReviewer>(
     `${WORKSPACE_API_PREFIX}/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/reviewers/${encodeURIComponent(assignmentId)}/remove`,
     { method: 'POST', body: JSON.stringify(payload) },
+  ),
+  getSessionVoting: (workspaceId: string, sessionId: string) =>
+    request<SessionVoting>(
+      `${WORKSPACE_API_PREFIX}/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/votes`,
+    ),
+  upsertTeamVote: (
+    workspaceId: string,
+    sessionId: string,
+    cardId: string,
+    payload: UpsertTeamVoteRequest,
+  ) => request<SessionVoting>(
+    `${WORKSPACE_API_PREFIX}/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/cards/${encodeURIComponent(cardId)}/vote`,
+    { method: 'PUT', body: JSON.stringify(payload) },
   ),
 }
