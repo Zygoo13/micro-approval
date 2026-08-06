@@ -72,6 +72,34 @@ export interface SharedReviewSessionDetail extends SharedReviewSessionSummary {
   decisions: SharedDecisionCard[]
 }
 
+export type ReviewSessionReviewerStatus = 'ASSIGNED' | 'REMOVED'
+
+export interface SessionReviewer {
+  assignmentId: string
+  sessionId: string
+  workspaceMemberId: string
+  userId: string
+  displayName: string
+  email: string
+  workspaceRole: WorkspaceRole
+  status: ReviewSessionReviewerStatus
+  assignedByUserId: string
+  assignedByDisplayName: string
+  assignedAt: string
+  removedAt: string | null
+  removedByUserId: string | null
+  removalReason: string | null
+  version: number
+}
+
+export interface AssignSessionReviewerRequest {
+  workspaceMemberId: string
+}
+
+export interface RemoveSessionReviewerRequest {
+  reason: string
+}
+
 export type AiProviderType = 'OPENAI' | 'GOOGLE_GENAI'
 export interface AiConfiguration { configured: boolean; provider: AiProviderType | null; model: string | null; enabled: boolean; keySuffix: string | null; updatedAt: string | null }
 

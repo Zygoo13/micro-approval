@@ -1,5 +1,6 @@
 import type {
   AddWorkspaceMemberRequest,
+  AssignSessionReviewerRequest,
   AiConfiguration,
   AiProviderType,
   AnalysisMode,
@@ -14,6 +15,8 @@ import type {
   SharedReviewSessionDetail,
   SharedReviewSessionSummary,
   MyWorkspaceInvitation,
+  RemoveSessionReviewerRequest,
+  SessionReviewer,
   UpdateWorkspaceMemberRoleRequest,
   WorkspaceDetail,
   WorkspaceInvitation,
@@ -247,4 +250,25 @@ export const api = {
     request<SharedReviewSessionDetail>(
       `${WORKSPACE_API_PREFIX}/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}`,
     ),
+  getSessionReviewers: (workspaceId: string, sessionId: string) =>
+    request<SessionReviewer[]>(
+      `${WORKSPACE_API_PREFIX}/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/reviewers`,
+    ),
+  assignSessionReviewer: (
+    workspaceId: string,
+    sessionId: string,
+    payload: AssignSessionReviewerRequest,
+  ) => request<SessionReviewer>(
+    `${WORKSPACE_API_PREFIX}/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/reviewers`,
+    { method: 'POST', body: JSON.stringify(payload) },
+  ),
+  removeSessionReviewer: (
+    workspaceId: string,
+    sessionId: string,
+    assignmentId: string,
+    payload: RemoveSessionReviewerRequest,
+  ) => request<SessionReviewer>(
+    `${WORKSPACE_API_PREFIX}/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/reviewers/${encodeURIComponent(assignmentId)}/remove`,
+    { method: 'POST', body: JSON.stringify(payload) },
+  ),
 }

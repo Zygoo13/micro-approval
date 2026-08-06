@@ -27,6 +27,7 @@ afterEach(() => vi.restoreAllMocks())
 function renderPage(response: SharedReviewSessionDetail = detail) {
   vi.spyOn(api, 'getWorkspaceById').mockResolvedValue(workspace)
   vi.spyOn(api, 'getSharedReviewSession').mockResolvedValue(response)
+  vi.spyOn(api, 'getSessionReviewers').mockResolvedValue([])
   return render(<MemoryRouter initialEntries={['/workspaces/workspace-1/sessions/session-1']}>
     <Routes><Route path="/workspaces/:workspaceId/sessions/:sessionId" element={<SharedSessionDetailPage />} /></Routes>
   </MemoryRouter>)
@@ -50,6 +51,7 @@ describe('SharedSessionDetailPage', () => {
     expect(screen.getByText('Nguồn: AI')).toBeInTheDocument()
     expect(screen.getByText('Có nên xóa kiểm tra quyền?')).toBeInTheDocument()
     expect(screen.getByText('Giá trị âm đã được kiểm tra chưa?')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Reviewers' })).toBeInTheDocument()
   })
 
   it('treats AI fallback as a successful session with Rule cards', async () => {
@@ -75,6 +77,7 @@ describe('SharedSessionDetailPage', () => {
     ['missing session', new ApiError('Không tìm thấy.', 404)],
     ['session from another workspace', new ApiError('Không tìm thấy.', 404)],
   ])('does not render %s after the API hides it', async (_name, apiError) => {
+    const getReviewers = vi.spyOn(api, 'getSessionReviewers')
     vi.spyOn(api, 'getWorkspaceById').mockResolvedValue(workspace)
     vi.spyOn(api, 'getSharedReviewSession').mockRejectedValue(apiError)
     render(<MemoryRouter initialEntries={['/workspaces/workspace-1/sessions/missing']}>
@@ -82,5 +85,7 @@ describe('SharedSessionDetailPage', () => {
     </MemoryRouter>)
     expect(await screen.findByText('Không tìm thấy Shared Review Session')).toBeInTheDocument()
     expect(screen.queryByText('Payment review')).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Reviewers' })).not.toBeInTheDocument()
+    expect(getReviewers).not.toHaveBeenCalled()
   })
 })

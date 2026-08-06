@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { ApiError, api } from '../lib/api'
 import { aiLabel, modeLabel, statusLabel } from '../lib/labels'
 import type { SharedDecisionCard, SharedReviewSessionDetail, WorkspaceDetail } from '../types'
+import SessionReviewersSection from '../features/workspace/SessionReviewersSection'
 
 export default function SharedSessionDetailPage() {
   const { workspaceId, sessionId } = useParams()
@@ -70,6 +71,8 @@ export default function SharedSessionDetailPage() {
     </dl>
 
     <AiOutcome session={session} />
+
+    <SessionReviewersSection workspace={workspace} sessionId={session.id} />
 
     <details className="source-panel">
       <summary>Xem nội dung đã gửi để phân tích</summary>

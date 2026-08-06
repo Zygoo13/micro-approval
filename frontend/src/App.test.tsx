@@ -51,3 +51,20 @@ describe('Shared Session routes', () => {
     expect(screen.getByRole('link', { name: 'Workspaces' })).toHaveAttribute('href', '/workspaces')
   })
 })
+
+describe('Personal Session isolation', () => {
+  it('does not render or request the reviewer roster on a Personal Session route', async () => {
+    auth.setToken('test-token')
+    vi.spyOn(api, 'getSession').mockResolvedValue({
+      id: 'personal-1', title: 'Personal review', mode: 'RAW_SNIPPET', rawContent: 'code',
+      promptContent: null, status: 'PENDING', aiAnalysisStatus: 'DISABLED',
+      aiAnalysisError: null, aiTokenUsed: 0, createdAt: '2026-08-06T01:00:00',
+      completedAt: null, decisions: [],
+    })
+    const getReviewers = vi.spyOn(api, 'getSessionReviewers')
+    render(<MemoryRouter initialEntries={['/sessions/personal-1']}><App /></MemoryRouter>)
+    expect(await screen.findByRole('heading', { name: 'Personal review' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Reviewers' })).not.toBeInTheDocument()
+    expect(getReviewers).not.toHaveBeenCalled()
+  })
+})

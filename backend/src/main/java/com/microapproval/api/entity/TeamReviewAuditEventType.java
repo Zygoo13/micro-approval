@@ -1,0 +1,7 @@
+package com.microapproval.api.entity;
+
+public enum TeamReviewAuditEventType {
+    REVIEWER_ASSIGNED,
+    REVIEWER_REMOVED,
+    REVIEWER_REACTIVATED
+}

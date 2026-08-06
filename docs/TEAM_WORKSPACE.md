@@ -34,9 +34,12 @@ direct administration of already registered users, and end-to-end invitations:
 13. The shared Rule → AI pipeline produces Decision Cards using system rules
     plus rules scoped to that workspace.
 14. Every ACTIVE member can list and read Shared sessions and their cards.
+15. OWNER or ADMIN assigns eligible ACTIVE workspace members as session reviewers.
+16. Reviewer removal is soft, re-assignment reuses the same row, and each
+    roster mutation writes a transactional audit event.
 
 Email delivery, public invitation links, self-leave, ownership transfer,
-Shared-session frontend, reviewer assignment, Team voting, notifications,
+Team voting, notifications,
 webhooks, and integrations remain outside these slices.
 
 ## Frontend
@@ -55,8 +58,12 @@ MEMBER and AUDITOR remain read-only. The create form supports RAW_SNIPPET,
 GIT_DIFF, and INTENT_MATCHING with backend-aligned validation and a visible
 synchronous-analysis state. Detail renders Rule and AI Decision Cards with
 textual source labels. AI FALLBACK is a non-fatal outcome and retains Rule
-cards. Voting, reviewer assignment, comments, and session closing remain
-outside this slice.
+cards. Shared Session Detail also renders the active reviewer roster for every
+ACTIVE role. OWNER and ADMIN receive candidate-filtered assign controls and a
+keyboard-usable, required-reason removal form; REVIEWER, MEMBER, and AUDITOR see
+the same roster read-only. Candidate options include only ACTIVE OWNER, ADMIN,
+or REVIEWER memberships not already present in the active roster. Voting,
+comments, and session closing remain outside this slice.
 
 The React application provides four Team Workspace route patterns:
 
@@ -154,6 +161,15 @@ SHARED   -> workspace_id IS NOT NULL
 V10 upgrades review-session creation/completion timestamps to microsecond
 precision so newest-first ordering remains deterministic for sessions created
 within the same second. Existing Personal rows and Decision Cards are retained.
+
+V11 creates `review_session_reviewers` and `team_review_audit_events`.
+Assignment is unique per `(session_id, workspace_member_id)`, has ASSIGNED and
+REMOVED states, and carries an optimistic version. Mutations serialize on the
+Shared Session row. Removal keeps history and requires a reason; reactivation
+clears removal metadata and preserves the assignment ID. Audit events record
+assign, remove, and reactivate in the same transaction. The legacy
+`review_sessions.assigned_to` column is retained and not backfilled because it
+never had active multi-reviewer semantics.
 
 Workspace names are stored with a maximum of 100 characters. Descriptions are
 validated at 1,000 characters by the API and stored as nullable `TEXT` so a
@@ -272,6 +288,9 @@ All Workspace, Member Management, and Invitation endpoints require a valid JWT:
 | `POST` | `/api/workspaces/{workspaceId}/sessions` | Create and synchronously analyze a Shared Review Session; return `201 Created` |
 | `GET` | `/api/workspaces/{workspaceId}/sessions` | ACTIVE-member summaries, newest first |
 | `GET` | `/api/workspaces/{workspaceId}/sessions/{sessionId}` | ACTIVE-member detail with Decision Cards |
+| `GET` | `/api/workspaces/{workspaceId}/sessions/{sessionId}/reviewers` | List currently ASSIGNED reviewers for an ACTIVE member |
+| `POST` | `/api/workspaces/{workspaceId}/sessions/{sessionId}/reviewers` | OWNER/ADMIN assigns or reactivates a reviewer; return `200 OK` |
+| `POST` | `/api/workspaces/{workspaceId}/sessions/{sessionId}/reviewers/{reviewerAssignmentId}/remove` | OWNER/ADMIN soft-removes an assignment with a reason; return `200 OK` |
 
 Create request:
 
@@ -425,6 +444,23 @@ Shared Session policy:
 Detail lookup includes `workspaceId + sessionId + SHARED`, so another
 workspace's session and a Personal session are both hidden as `404`.
 
+Reviewer-assignment policy:
+
+| Caller | View active roster | Assign/reactivate/remove |
+|---|---:|---:|
+| `OWNER` | Yes | Yes |
+| `ADMIN` | Yes | Yes |
+| `REVIEWER`, `MEMBER`, `AUDITOR` | Yes | No (`403`) |
+| PENDING/REMOVED/non-member | Hidden (`404`) | Hidden (`404`) |
+
+Only an ACTIVE membership with role `OWNER`, `ADMIN`, or `REVIEWER` is an
+eligible assignment target. The request uses the workspace-membership ID, not
+an arbitrary user ID. Duplicate active assignment returns `409`; a removed row
+is reactivated with the same assignment ID. Removal requires a non-blank reason
+of at most 1,000 characters. Assignment endpoints are scoped by workspace,
+session, and `SHARED`, so Personal sessions and cross-workspace identifiers are
+hidden as `404`.
+
 Errors use `400` for invalid operations, `403` for an active member without
 sufficient role authority, `404` for hidden/missing workspace resources or an
 unknown registered user, and `409` for membership-state conflicts.
@@ -468,6 +504,14 @@ fallback, Decision Card ownership, newest-first list isolation, detail scope,
 Personal exclusion, authentication, and database workspace/type constraints.
 `PersonalSessionAiAnalysisTest` continues to verify the shared pipeline's Rule
 before AI order, token accounting, and fallback behavior for Personal sessions.
+
+`ReviewSessionReviewerControllerIntegrationTest` covers roster visibility,
+OWNER/ADMIN authorization, eligible and invalid targets, cross-workspace and
+Personal isolation, duplicate rejection, soft removal, required removal reason,
+same-row reactivation, and transactional audit records.
+`ReviewSessionReviewerConcurrencyIntegrationTest` runs two simultaneous assigns
+and verifies one success, one `409` conflict, one assignment row, and one audit
+event.
 
 Run this slice:
 
@@ -513,6 +557,13 @@ accept/reject, workspace navigation, confirmation cancellation, 404/409
 stability, and authoritative 410 expiration. `App.test.tsx` verifies the
 protected route and navigation entry.
 
+`SessionReviewersSection.test.tsx` covers roster loading/empty/error/retry,
+all five role presentations, candidate eligibility, assignment validation and
+pending state, authoritative create/reactivate responses, duplicate and stale
+conflicts, required-reason removal, cancellation, delayed server confirmation,
+and self-remove messaging. Shared and Personal detail tests verify that the
+section is mounted only after a valid Shared Session is loaded.
+
 ## Main implementation files
 
 - `entity/Workspace.java`, `entity/WorkspaceMember.java`, and their enums.
@@ -521,10 +572,12 @@ protected route and navigation entry.
 - `service/WorkspaceMemberService.java`.
 - `service/WorkspaceInvitationService.java`.
 - `service/ReviewAnalysisPipeline.java` and `SharedReviewSessionService.java`.
+- `service/ReviewSessionReviewerService.java`.
 - `controller/WorkspaceController.java` and `WorkspaceMemberController.java`.
 - `controller/WorkspaceInvitationController.java` and
   `MyWorkspaceInvitationController.java`.
 - `controller/SharedReviewSessionController.java`.
+- `controller/ReviewSessionReviewerController.java`.
 - `dto/CreateWorkspaceRequest.java`, `WorkspaceResponse.java`, and
   `WorkspaceSummaryResponse.java`.
 - `dto/AddWorkspaceMemberRequest.java`,
@@ -535,15 +588,17 @@ protected route and navigation entry.
 - `db/migration/V8__create_workspace_invitations.sql`.
 - `db/migration/V9__support_shared_review_sessions.sql`.
 - `db/migration/V10__increase_review_session_timestamp_precision.sql`.
+- `db/migration/V11__create_review_session_reviewers.sql`.
 - `frontend/src/features/workspace/WorkspaceInvitationsSection.tsx`.
+- `frontend/src/features/workspace/SessionReviewersSection.tsx`.
 - `frontend/src/pages/MyInvitationsPage.tsx` and route `/invitations`.
 
 ## Next Team Workspace work
 
 Continue in separate vertical slices:
 
-1. Frontend Shared Review Session list/create/detail.
-2. Reviewer assignment and a separately designed Team voting model.
+1. Team voting backend using the separately designed per-reviewer decision model.
+2. Team voting frontend after its API and aggregate semantics are stable.
 3. Optional email delivery and authenticated invitation links.
 4. Projects owned by a workspace.
 5. Notifications, audit projections, and integrations.

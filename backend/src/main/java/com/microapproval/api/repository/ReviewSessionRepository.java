@@ -3,7 +3,9 @@ package com.microapproval.api.repository;
 
 import com.microapproval.api.entity.ReviewSession;
 import com.microapproval.api.entity.WorkspaceType;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -41,6 +43,21 @@ public interface ReviewSessionRepository extends JpaRepository<ReviewSession, St
               AND session.workspaceType = :workspaceType
             """)
     Optional<ReviewSession> findWithSubmitterAndWorkspaceByIdAndWorkspaceIdAndType(
+            @Param("sessionId") String sessionId,
+            @Param("workspaceId") String workspaceId,
+            @Param("workspaceType") WorkspaceType workspaceType
+    );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT session
+            FROM ReviewSession session
+            JOIN FETCH session.workspace
+            WHERE session.id = :sessionId
+              AND session.workspace.id = :workspaceId
+              AND session.workspaceType = :workspaceType
+            """)
+    Optional<ReviewSession> findByWorkspaceAndTypeForUpdate(
             @Param("sessionId") String sessionId,
             @Param("workspaceId") String workspaceId,
             @Param("workspaceType") WorkspaceType workspaceType
