@@ -39,8 +39,9 @@ direct administration of already registered users, and end-to-end invitations:
     roster mutation writes a transactional audit event.
 
 Email delivery, public invitation links, self-leave, ownership transfer,
-comments, Audit Timeline, notifications, webhooks, and integrations remain
-outside these slices.
+comments, the Audit Timeline frontend, notifications, webhooks, and integrations
+remain outside these slices. The read-only Audit Timeline backend API is
+implemented.
 
 ## Frontend
 
@@ -81,8 +82,8 @@ result, closer/time/reason, reviewer roster, votes, notes, and aggregates while
 hiding vote and roster mutations. A lifecycle `409` triggers one authoritative
 detail/vote/reviewer refresh without automatically retrying the mutation.
 REVIEWER, MEMBER, and AUDITOR remain read-only. Personal Session routes do not
-render lifecycle controls or call lifecycle APIs. Comments and Audit Timeline
-remain outside this slice.
+render lifecycle controls or call lifecycle APIs. Comments and the Audit
+Timeline frontend remain outside this slice.
 
 The React application provides four Team Workspace route patterns:
 
@@ -204,6 +205,10 @@ V13 adds authoritative Shared Session lifecycle fields `closed_at`,
 Shared rows remain open by default; `completed_at` is not backfilled or reused.
 Closed Shared results stay APPROVED/REJECTED and are frozen until OWNER/ADMIN
 reopens the session.
+
+V14 replaces the earlier audit lookup index with
+`(session_id, created_at, id)`, matching the Audit Timeline's deterministic
+newest-first query and tie-break ordering.
 
 Workspace names are stored with a maximum of 100 characters. Descriptions are
 validated at 1,000 characters by the API and stored as nullable `TEXT` so a
@@ -330,6 +335,7 @@ All Workspace, Member Management, and Invitation endpoints require a valid JWT:
 | `PUT` | `/api/workspaces/{workspaceId}/sessions/{sessionId}/cards/{cardId}/vote` | Eligible ASSIGNED reviewer creates or updates their own vote |
 | `POST` | `/api/workspaces/{workspaceId}/sessions/{sessionId}/close` | OWNER/ADMIN closes an APPROVED/REJECTED Shared Session; optional `{ "reason": "..." }` |
 | `POST` | `/api/workspaces/{workspaceId}/sessions/{sessionId}/reopen` | OWNER/ADMIN reopens and recalculates a closed Shared Session; no body |
+| `GET` | `/api/workspaces/{workspaceId}/sessions/{sessionId}/audit?page=0&size=20` | Any ACTIVE member reads the safe, newest-first Shared Session audit projection |
 
 Close/reopen never changes the result enum to `CLOSED`: close metadata is a
 separate lifecycle dimension returned by Shared detail, summary, voting, and
@@ -338,6 +344,13 @@ lifecycle responses. While `closed=true`, vote and reviewer mutations return
 remain allowed but do not mutate assignments or aggregates in the frozen
 session. Reopen clears current close metadata and recalculates against current
 membership eligibility. Audit events retain the prior close state and reason.
+
+The Audit Timeline accepts zero-based pages with a default size of 20 and a
+maximum of 100. Ordering is `createdAt DESC, eventId DESC`. It returns typed,
+allowlisted reviewer, vote, and lifecycle changes only; persistence JSON, raw
+submitted content, card questions, diffs, prompts, and AI/provider data are not
+part of the contract. Non-members, inactive members, Personal Sessions, and
+workspace/session mismatches use the same hidden `404` contract.
 
 Create request:
 
@@ -653,6 +666,11 @@ authoritative refresh without retry. Shared detail integration tests verify that
 closing hides vote/reviewer mutations while retaining read models, reopening
 restores eligible controls, and Personal routes remain isolated.
 
+`TeamReviewAuditTimelineControllerIntegrationTest` covers all ACTIVE workspace
+roles, hidden-resource authorization, all seven event kinds, typed safe mapping,
+removed targets, optional relations, deterministic ordering and pagination,
+empty timelines, malformed/unknown JSON, and invalid page parameters.
+
 ## Main implementation files
 
 - `entity/Workspace.java`, `entity/WorkspaceMember.java`, and their enums.
@@ -663,12 +681,15 @@ restores eligible controls, and Personal routes remain isolated.
 - `service/ReviewAnalysisPipeline.java` and `SharedReviewSessionService.java`.
 - `service/ReviewSessionReviewerService.java`.
 - `service/TeamVotingService.java` and `TeamReviewAggregationService.java`.
+- `service/TeamReviewAuditTimelineService.java`.
 - `controller/WorkspaceController.java` and `WorkspaceMemberController.java`.
 - `controller/WorkspaceInvitationController.java` and
   `MyWorkspaceInvitationController.java`.
 - `controller/SharedReviewSessionController.java`.
 - `controller/ReviewSessionReviewerController.java`.
 - `controller/TeamVotingController.java`.
+- `controller/TeamReviewAuditTimelineController.java` and the
+  `dto/SessionAudit*Response.java` contracts.
 - `dto/CreateWorkspaceRequest.java`, `WorkspaceResponse.java`, and
   `WorkspaceSummaryResponse.java`.
 - `dto/AddWorkspaceMemberRequest.java`,
@@ -682,6 +703,7 @@ restores eligible controls, and Personal routes remain isolated.
 - `db/migration/V11__create_review_session_reviewers.sql`.
 - `db/migration/V12__create_team_decision_votes.sql`.
 - `db/migration/V13__support_shared_session_closing.sql`.
+- `db/migration/V14__index_team_review_audit_timeline.sql`.
 - `frontend/src/features/workspace/WorkspaceInvitationsSection.tsx`.
 - `frontend/src/features/workspace/SessionReviewersSection.tsx`.
 - `frontend/src/features/workspace/TeamVotingSection.tsx`.
@@ -692,7 +714,7 @@ restores eligible controls, and Personal routes remain isolated.
 
 Continue in separate vertical slices:
 
-1. Append-only Audit Timeline API/UI for reviewer, vote, close, and reopen events.
+1. Audit Timeline frontend consuming the implemented read-only backend API.
 2. Optional email delivery and authenticated invitation links.
 3. Projects owned by a workspace.
 4. Notifications, audit projections, and integrations.

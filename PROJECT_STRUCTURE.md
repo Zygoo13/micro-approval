@@ -60,7 +60,7 @@ micro-approval/
 ### Backend
 
 - `controller` may depend on `dto` and `service`; it must not access repositories directly.
-- `service` owns use cases, authorization decisions, transaction boundaries, and orchestration between Rule and AI engines. `WorkspaceMemberService` owns direct membership lifecycle use cases, `WorkspaceInvitationService` owns invitation state transitions, `SharedReviewSessionService` owns workspace-scoped session use cases, `SharedReviewSessionLifecycleService` owns close/reopen, `ReviewSessionReviewerService` owns the reviewer roster lifecycle, `TeamVotingService` owns per-reviewer vote mutations/read models, `TeamReviewAggregationService` owns deterministic Shared card/session aggregation, and `WorkspaceAccessService` is the centralized workspace authorization policy. `ReviewAnalysisPipeline` is shared by Personal and Shared session creation.
+- `service` owns use cases, authorization decisions, transaction boundaries, and orchestration between Rule and AI engines. `WorkspaceMemberService` owns direct membership lifecycle use cases, `WorkspaceInvitationService` owns invitation state transitions, `SharedReviewSessionService` owns workspace-scoped session use cases, `SharedReviewSessionLifecycleService` owns close/reopen, `ReviewSessionReviewerService` owns the reviewer roster lifecycle, `TeamVotingService` owns per-reviewer vote mutations/read models, `TeamReviewAggregationService` owns deterministic Shared card/session aggregation, `TeamReviewAuditTimelineService` owns the safe read-only audit projection, and `WorkspaceAccessService` is the centralized workspace authorization policy. `ReviewAnalysisPipeline` is shared by Personal and Shared session creation.
 - `repository` is the only persistence abstraction used by services. Keep query methods named for the business scope they enforce.
 - `entity` contains persistence-backed business state; it must not depend on controllers or DTOs.
 - `dto` is the HTTP contract. Do not return entities from controllers.
@@ -122,6 +122,10 @@ in the same transaction as roster mutations.
 one `MicroDecision` and one `ReviewSessionReviewer`, while Personal decisions
 remain authoritative in `MicroDecision.humanDecision`. Team vote mutations,
 audit writes, card aggregation, and session aggregation share one transaction.
+Audit Timeline reads are a separate projection: query by session with
+`createdAt DESC, id DESC`, page the result, and map an explicit allowlist into
+typed DTOs. Never expose persistence JSON, raw content, Decision Card questions,
+diffs, prompts, or provider data through the audit endpoint.
 Recalculation locks in the stable order session → cards → assignments → votes;
 read-only vote views use fetch-join queries without exposing JPA entities.
 

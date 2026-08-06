@@ -37,6 +37,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.data.domain.Pageable;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -185,14 +186,17 @@ class TeamVotingControllerIntegrationTest {
         Number updatedVersion = JsonPath.read(updated, "$.cards[0].votes[0].version");
 
         assertThat(updatedVersion.longValue()).isEqualTo(version.longValue() + 1);
-        assertThat(voteRepository.count()).isOne();
-        assertThat(auditRepository.findAll())
+        assertThat(voteRepository.countByDecisionCardSessionId(fixture.session().getId())).isOne();
+        var sessionAudits = auditRepository.findBySessionId(
+                fixture.session().getId(), Pageable.unpaged()
+        ).getContent();
+        assertThat(sessionAudits)
                 .extracting(event -> event.getEventType())
                 .containsExactlyInAnyOrder(
                         TeamReviewAuditEventType.VOTE_CREATED,
                         TeamReviewAuditEventType.VOTE_UPDATED
                 );
-        var updateAudit = auditRepository.findAll().stream()
+        var updateAudit = sessionAudits.stream()
                 .filter(event -> event.getEventType() == TeamReviewAuditEventType.VOTE_UPDATED)
                 .findFirst()
                 .orElseThrow();

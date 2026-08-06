@@ -1,15 +1,16 @@
 # Team Review: Reviewer Assignment and Voting Design
 
-Status: **Reviewer Assignment, Team Voting, and Session Closing/Reopening backend/frontend implemented; Audit Timeline pending**
+Status: **Reviewer Assignment, Team Voting, and Session Closing/Reopening backend/frontend implemented; Audit Timeline backend implemented and frontend pending**
 
 Applies to: Shared Review Sessions only
 
-Reviewed against: application code and Flyway V1–V13
+Reviewed against: application code and Flyway V1–V14
 
 Implementation note: Slice A now provides the reviewer roster APIs,
 `review_session_reviewers`, and minimal append-only assignment audit events.
 V11 intentionally introduced ASSIGNED, REMOVED, and REACTIVATED audit events;
-V12 added vote events and V13 added SESSION_CLOSED/SESSION_REOPENED. The roster
+V12 added vote events, V13 added SESSION_CLOSED/SESSION_REOPENED, and V14 added
+the deterministic Audit Timeline lookup index. The roster
 endpoint exposes ASSIGNED rows only, remove reason is always required, and both
 new assignment and reactivation return `200 OK` with the authoritative DTO.
 Slice B renders the active roster on Shared Session Detail. OWNER/ADMIN load
@@ -26,8 +27,9 @@ Removal/reactivation increments that version, so the old vote remains visible
 for audit with `counted=false` and is excluded until the reviewer confirms it
 again with PUT. Slice D adds the frontend voting UI. V13 supplies backend
 close/reopen state and Shared Session Detail now provides permission-aware
-lifecycle controls and the closed read-only experience. OWNER override, Audit
-Timeline, and alternative quorum remain outside the implemented scope.
+lifecycle controls and the closed read-only experience. The backend now exposes
+a safe read-only Audit Timeline; its frontend, OWNER override, and alternative
+quorum remain outside the implemented scope.
 
 ## 1. Baseline before V11/V12 (historical)
 
@@ -317,6 +319,15 @@ SESSION_REOPENED. Vote audit rows reference
 the card and assignment and store old/new decision, note, assignment version,
 and vote version as JSON. They never store secrets or raw source code.
 
+`GET /api/workspaces/{workspaceId}/sessions/{sessionId}/audit` exposes these
+events to every ACTIVE workspace role as a typed allowlisted projection. It is
+newest-first by `created_at DESC, id DESC`, defaults to page 0/size 20, and caps
+size at 100. Personal Sessions, inactive/non-members, and cross-workspace IDs
+receive the hidden `404` contract. Raw JSON, submitted content, card questions,
+diffs, prompts, secrets, and AI/provider data are never returned. Actor and
+target display fields reflect the currently referenced users; the schema does
+not currently snapshot historical display names or roles.
+
 ## 5. Authorization matrix
 
 All actions first require an ACTIVE membership; non-members and inactive
@@ -603,13 +614,15 @@ automatic resubmit. The slice intentionally has no realtime transport, so other
 reviewers' changes appear on reload, roster refresh, successful mutation, or
 conflict recovery.
 
-### Slice E — Session closing backend/frontend (implemented) and Audit Timeline (pending)
+### Slice E — Session closing backend/frontend and Audit Timeline backend (implemented)
 
 - Implemented: close/reopen columns and APIs, frozen-result coordination,
   lifecycle mutation guards, audit writes, concurrency protection,
   permission-aware controls, closed read-only views, and conflict refresh.
-- Pending: append-only history endpoint and UI timeline. Frontend lifecycle
-  controls and closed read-only states are implemented.
+- Implemented: paged append-only history endpoint with ACTIVE-member access,
+  hidden-resource checks, deterministic ordering, and safe typed projections.
+- Pending: frontend Audit Timeline. Frontend lifecycle controls and closed
+  read-only states are implemented.
 - Out: override, expiration, notification, webhook.
 - Depends on: Slices A–D.
 - Tests: close/reopen role matrix, unresolved conflict, vote-vs-close race,

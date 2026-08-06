@@ -118,7 +118,7 @@ class ReviewSessionReviewerControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.workspaceRole").value("REVIEWER"));
 
-        assertThat(reviewerRepository.findAll()).hasSize(4);
+        assertThat(reviewerRepository.countBySessionId(fixture.session().getId())).isEqualTo(4);
         assertThat(auditRepository.countBySessionId(fixture.session().getId())).isEqualTo(4);
     }
 
@@ -133,7 +133,7 @@ class ReviewSessionReviewerControllerIntegrationTest {
         for (WorkspaceMember target : new WorkspaceMember[]{member, auditor, pending, removed}) {
             assign(fixture, fixture.owner(), target).andExpect(status().isBadRequest());
         }
-        assertThat(reviewerRepository.findAll()).isEmpty();
+        assertThat(reviewerRepository.countBySessionId(fixture.session().getId())).isZero();
     }
 
     @Test
@@ -165,7 +165,7 @@ class ReviewSessionReviewerControllerIntegrationTest {
                 .andExpect(jsonPath("$.removedAt").doesNotExist())
                 .andExpect(jsonPath("$.removalReason").doesNotExist());
 
-        assertThat(reviewerRepository.findAll()).hasSize(1);
+        assertThat(reviewerRepository.countBySessionId(fixture.session().getId())).isOne();
         assertThat(auditRepository.countBySessionId(fixture.session().getId())).isEqualTo(3);
     }
 
@@ -209,7 +209,7 @@ class ReviewSessionReviewerControllerIntegrationTest {
         ReviewSessionReviewer persisted = reviewerRepository.findById(assignmentId).orElseThrow();
         assertThat(persisted.getStatus()).isEqualTo(ReviewSessionReviewerStatus.REMOVED);
         assertThat(persisted.getRemovalReason()).isEqualTo("Không còn tham gia phiên");
-        assertThat(reviewerRepository.findAll()).hasSize(1);
+        assertThat(reviewerRepository.countBySessionId(fixture.session().getId())).isOne();
         assertThat(auditRepository.countBySessionId(fixture.session().getId())).isEqualTo(2);
     }
 
