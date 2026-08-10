@@ -30,6 +30,7 @@ import com.microapproval.api.repository.TeamReviewAuditEventRepository;
 import com.microapproval.api.repository.UserRepository;
 import com.microapproval.api.repository.WorkspaceMemberRepository;
 import com.microapproval.api.repository.WorkspaceRepository;
+import com.microapproval.api.support.AbstractMySqlIntegrationTest;
 import com.microapproval.api.service.ReviewSessionReviewerService;
 import com.microapproval.api.service.WorkspaceMemberService;
 import org.junit.jupiter.api.Test;
@@ -54,7 +55,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
-class TeamVotingControllerIntegrationTest {
+class TeamVotingControllerIntegrationTest extends AbstractMySqlIntegrationTest {
 
     @Autowired private MockMvc mockMvc;
     @Autowired private UserRepository userRepository;
@@ -159,7 +160,7 @@ class TeamVotingControllerIntegrationTest {
         String tooLong = "a".repeat(2001);
         vote(fixture, fixture.owner(), fixture.card().getId(), "APPROVED", tooLong, null)
                 .andExpect(status().isBadRequest());
-        assertThat(voteRepository.count()).isZero();
+        assertThat(voteRepository.countByDecisionCardSessionId(fixture.session().getId())).isZero();
     }
 
     @Test

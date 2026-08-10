@@ -11,6 +11,7 @@ import com.microapproval.api.repository.UserRepository;
 import com.microapproval.api.repository.WorkspaceInvitationRepository;
 import com.microapproval.api.repository.WorkspaceMemberRepository;
 import com.microapproval.api.repository.WorkspaceRepository;
+import com.microapproval.api.support.AbstractMySqlIntegrationTest;
 import com.microapproval.api.exception.ConflictException;
 import com.microapproval.api.service.WorkspaceInvitationService;
 import jakarta.persistence.LockModeType;
@@ -43,7 +44,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
-class WorkspaceInvitationControllerIntegrationTest {
+class WorkspaceInvitationControllerIntegrationTest extends AbstractMySqlIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;

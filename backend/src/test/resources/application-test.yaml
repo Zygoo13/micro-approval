@@ -1,0 +1,27 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+  ai:
+    openai:
+      api-key: ""
+    google:
+      genai:
+        api-key: ""
+
+ai:
+  analysis:
+    enabled: true
+  credentials:
+    # Test-only AES-256 key; never use this value outside automated tests.
+    encryption-key: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
+
+jwt:
+  # Test-only HMAC secret; never use this value in a running application.
+  secret: test-only-jwt-secret-for-micro-approval-integration-suite
+
+logging:
+  level:
+    org.testcontainers: INFO

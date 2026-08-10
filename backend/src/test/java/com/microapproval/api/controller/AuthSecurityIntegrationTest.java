@@ -2,6 +2,7 @@ package com.microapproval.api.controller;
 
 import com.microapproval.api.entity.User;
 import com.microapproval.api.repository.UserRepository;
+import com.microapproval.api.support.AbstractMySqlIntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -23,7 +24,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
-class AuthSecurityIntegrationTest {
+class AuthSecurityIntegrationTest extends AbstractMySqlIntegrationTest {
 
     private static final String LOCALHOST_ORIGIN = "http://localhost:3000";
     private static final String LOOPBACK_ORIGIN = "http://127.0.0.1:3000";

@@ -31,6 +31,7 @@ import com.microapproval.api.repository.TeamReviewAuditEventRepository;
 import com.microapproval.api.repository.UserRepository;
 import com.microapproval.api.repository.WorkspaceMemberRepository;
 import com.microapproval.api.repository.WorkspaceRepository;
+import com.microapproval.api.support.AbstractMySqlIntegrationTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,7 +50,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
-class TeamVotingConcurrencyIntegrationTest {
+class TeamVotingConcurrencyIntegrationTest extends AbstractMySqlIntegrationTest {
 
     @Autowired private TeamVotingService votingService;
     @Autowired private ReviewSessionReviewerService reviewerService;

@@ -29,6 +29,7 @@ import com.microapproval.api.repository.TeamReviewAuditEventRepository;
 import com.microapproval.api.repository.UserRepository;
 import com.microapproval.api.repository.WorkspaceMemberRepository;
 import com.microapproval.api.repository.WorkspaceRepository;
+import com.microapproval.api.support.AbstractMySqlIntegrationTest;
 import com.microapproval.api.service.ReviewSessionReviewerService;
 import com.microapproval.api.service.TeamVotingService;
 import com.microapproval.api.service.WorkspaceMemberService;
@@ -53,7 +54,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
-class SharedReviewSessionLifecycleControllerIntegrationTest {
+class SharedReviewSessionLifecycleControllerIntegrationTest extends AbstractMySqlIntegrationTest {
 
     @Autowired private MockMvc mockMvc;
     @Autowired private UserRepository userRepository;

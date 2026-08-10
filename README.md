@@ -16,7 +16,9 @@ authorization, persistence, and test contracts.
   verified with JDK 25.0.2.
 - Node.js `^20.19.0` or `>=22.12.0`; Node 24.14.0 and npm 11.9.0 were last
   verified.
-- Docker Desktop with Docker Compose, or a local MySQL 8 instance.
+- Docker Desktop with Docker Compose. Backend integration tests use Docker to
+  start their own disposable MySQL 8 instance; a local MySQL installation is
+  optional for application development.
 - PowerShell examples below assume the repository root is the current directory.
 
 There is intentionally no root `package.json`. Run npm commands from
@@ -176,14 +178,91 @@ volume namespace, for example `docker compose -p micro-approval-e2e ...`.
 | Spring Boot API | 8080 (host development; internal-only in full Docker) |
 | Vite/Nginx frontend | 3000 |
 
-## Verification
+## Continuous Integration
 
-Backend tests use the configured MySQL schema and clean their own fixtures:
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push and on
+every pull request targeting `main`. New runs on the same branch or pull request
+cancel an older in-progress run. The workflow has read-only repository access
+and does not receive production secrets or deploy the application.
+
+The independent `backend-test` and `frontend-quality` jobs run in parallel:
+
+- `backend-test` uses Temurin Java 21, the Maven Wrapper and Maven dependency
+  caching. Testcontainers starts its own MySQL 8 container, Flyway applies V1
+  through V14, Hibernate validates the schema, and the complete backend suite
+  runs without a manually configured MySQL service. Surefire reports are kept
+  for seven days only when this job fails.
+- `frontend-quality` uses Node.js 24, npm caching and `npm ci`, then runs the
+  high/critical dependency audit, type-check, lint, Vitest suite and production
+  build.
+
+After both quality jobs pass, `docker-build` validates Compose with explicit
+CI-only dummy values, builds the backend and frontend images, and starts an
+isolated disposable stack. It checks the frontend root and backend authentication
+route through the Nginx proxy, prints container logs on failure, and always runs
+`docker compose down -v`. No image is pushed to a registry.
+
+For branch protection on `main`, enable pull requests, require branches to be up
+to date, and require these status checks before merge:
+
+- `backend-test`
+- `frontend-quality`
+- `docker-build`
+
+These repository settings require GitHub administrator access and are only a
+recommendation; the workflow does not enable branch protection itself.
+
+### Run CI checks locally
+
+Backend on Linux/macOS:
+
+```bash
+cd backend
+./mvnw clean test
+```
+
+Backend on Windows PowerShell:
 
 ```powershell
 cd backend
 .\mvnw.cmd clean test
 ```
+
+Frontend:
+
+```bash
+cd frontend
+npm ci
+npm audit --audit-level=high
+npm run type-check
+npm run lint
+npm test
+npm run build
+```
+
+Docker, after configuring the required values described in `.env.example`:
+
+```bash
+docker compose config --quiet
+docker compose build
+```
+
+## Verification
+
+Backend integration and concurrency tests use Testcontainers. The command below
+starts one disposable `mysql:8.0` container for the Maven test JVM, maps a random
+host port, applies Flyway V1 through V14, validates the schema with Hibernate,
+runs the suite, and removes the container automatically:
+
+```powershell
+cd backend
+.\mvnw.cmd clean test
+```
+
+Docker must be running, but no manual test schema, database credentials, or
+service on `localhost:3306` is required. Pure unit tests do not start a database
+container. Testcontainers dependencies and credentials are test-scoped; they
+are not part of the production application artifact.
 
 Frontend quality gates:
 
@@ -202,7 +281,7 @@ Repository whitespace validation:
 git diff --check
 ```
 
-The stabilization baseline is 109 backend tests and 136 frontend tests across
+The stabilization baseline is 110 backend tests and 136 frontend tests across
 14 files, with type-check, lint, production build, Flyway V14 validation, and
 Hibernate validation passing.
 
@@ -225,10 +304,12 @@ Hibernate validation passing.
 - AI calls are synchronous and currently have no retry, circuit breaker, or
   provider-specific configurable timeout. Rule-only fallback is implemented.
 - The MVP does not include notifications, realtime updates, GitHub integration,
-  monitoring, backup/restore automation, CI/CD, or production deployment.
-- Local integration tests use the configured MySQL instance; isolated CI should
-  provide a disposable database (for example, a dedicated schema or
-  Testcontainers) before parallel test execution.
+  monitoring, backup/restore automation, deployment automation, or production
+  deployment.
+- CI workers must provide a Docker-compatible runtime for the Testcontainers
+  integration suite. GitHub-hosted workflow verification requires committing
+  and pushing the workflow; local verification cannot establish its hosted run
+  status.
 
 ## Production baseline limitations
 
