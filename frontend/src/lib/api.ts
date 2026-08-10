@@ -97,8 +97,12 @@ function fallbackMessage(status: number): string {
   return 'Không thể hoàn tất yêu cầu.'
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const token = auth.getToken()
+async function request<T>(
+  path: string,
+  options: RequestInit = {},
+  includeAuth = true,
+): Promise<T> {
+  const token = includeAuth ? auth.getToken() : null
   let response: Response
 
   try {
@@ -132,12 +136,12 @@ export const api = {
     request<AuthResponse>(`${API_PREFIX}/auth/register`, {
       method: 'POST',
       body: JSON.stringify(payload),
-    }),
+    }, false),
   login: (payload: { email: string; password: string }) =>
     request<AuthResponse>(`${API_PREFIX}/auth/login`, {
       method: 'POST',
       body: JSON.stringify(payload),
-    }),
+    }, false),
   listSessions: () => request<PersonalSession[]>(`${API_PREFIX}/personal/sessions`),
   getSession: (id: string) =>
     request<PersonalSession>(`${API_PREFIX}/personal/sessions/${id}`),
