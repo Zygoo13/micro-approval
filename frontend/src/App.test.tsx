@@ -62,9 +62,11 @@ describe('Personal Session isolation', () => {
       completedAt: null, decisions: [],
     })
     const getReviewers = vi.spyOn(api, 'getSessionReviewers')
+    const getAudit = vi.spyOn(api, 'getSessionAuditTimeline')
     render(<MemoryRouter initialEntries={['/sessions/personal-1']}><App /></MemoryRouter>)
     expect(await screen.findByRole('heading', { name: 'Personal review' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Reviewers' })).not.toBeInTheDocument()
     expect(getReviewers).not.toHaveBeenCalled()
+    expect(getAudit).not.toHaveBeenCalled()
   })
 })

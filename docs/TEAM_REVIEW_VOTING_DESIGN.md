@@ -1,6 +1,6 @@
 # Team Review: Reviewer Assignment and Voting Design
 
-Status: **Reviewer Assignment, Team Voting, and Session Closing/Reopening backend/frontend implemented; Audit Timeline backend implemented and frontend pending**
+Status: **Reviewer Assignment, Team Voting, Session Closing/Reopening, and Audit Timeline backend/frontend implemented**
 
 Applies to: Shared Review Sessions only
 
@@ -27,8 +27,10 @@ Removal/reactivation increments that version, so the old vote remains visible
 for audit with `counted=false` and is excluded until the reviewer confirms it
 again with PUT. Slice D adds the frontend voting UI. V13 supplies backend
 close/reopen state and Shared Session Detail now provides permission-aware
-lifecycle controls and the closed read-only experience. The backend now exposes
-a safe read-only Audit Timeline; its frontend, OWNER override, and alternative
+lifecycle controls and the closed read-only experience. Shared Session Detail
+now consumes the safe read-only Audit Timeline with Load More pagination,
+structured event wording, safe legacy fallbacks, and refresh after successful
+reviewer, vote, close, and reopen mutations. OWNER override and alternative
 quorum remain outside the implemented scope.
 
 ## 1. Baseline before V11/V12 (historical)
@@ -614,15 +616,16 @@ automatic resubmit. The slice intentionally has no realtime transport, so other
 reviewers' changes appear on reload, roster refresh, successful mutation, or
 conflict recovery.
 
-### Slice E — Session closing backend/frontend and Audit Timeline backend (implemented)
+### Slice E — Session closing and Audit Timeline backend/frontend (implemented)
 
 - Implemented: close/reopen columns and APIs, frozen-result coordination,
   lifecycle mutation guards, audit writes, concurrency protection,
   permission-aware controls, closed read-only views, and conflict refresh.
 - Implemented: paged append-only history endpoint with ACTIVE-member access,
   hidden-resource checks, deterministic ordering, and safe typed projections.
-- Pending: frontend Audit Timeline. Frontend lifecycle controls and closed
-  read-only states are implemented.
+- Implemented: frontend timeline for all ACTIVE roles with loading, empty,
+  error/retry, Load More, event-ID deduplication, responsive layout, safe partial
+  event fallbacks, mutation refresh, and Personal Session isolation.
 - Out: override, expiration, notification, webhook.
 - Depends on: Slices A–D.
 - Tests: close/reopen role matrix, unresolved conflict, vote-vs-close race,

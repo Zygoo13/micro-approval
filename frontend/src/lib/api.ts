@@ -18,6 +18,7 @@ import type {
   SharedSessionLifecycleResponse,
   MyWorkspaceInvitation,
   RemoveSessionReviewerRequest,
+  SessionAuditTimeline,
   SessionReviewer,
   SessionVoting,
   UpsertTeamVoteRequest,
@@ -292,6 +293,14 @@ export const api = {
     request<SessionVoting>(
       `${WORKSPACE_API_PREFIX}/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/votes`,
     ),
+  getSessionAuditTimeline: (
+    workspaceId: string,
+    sessionId: string,
+    page = 0,
+    size = 20,
+  ) => request<SessionAuditTimeline>(
+    `${WORKSPACE_API_PREFIX}/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}/audit?page=${page}&size=${size}`,
+  ),
   upsertTeamVote: (
     workspaceId: string,
     sessionId: string,

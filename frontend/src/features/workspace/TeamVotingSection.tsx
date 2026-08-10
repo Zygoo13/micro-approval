@@ -41,6 +41,7 @@ export default function TeamVotingSection({
   closed = false,
   onSessionStatusChange,
   onSessionVotingChange,
+  onVoteChanged,
 }: {
   workspace: WorkspaceDetail
   sessionId: string
@@ -49,6 +50,7 @@ export default function TeamVotingSection({
   closed?: boolean
   onSessionStatusChange?: (status: SessionVotingStatus) => void
   onSessionVotingChange?: (voting: SessionVoting) => void
+  onVoteChanged?: () => void
 }) {
   const [voting, setVoting] = useState<SessionVoting>()
   const [reviewers, setReviewers] = useState<SessionReviewer[]>([])
@@ -97,6 +99,7 @@ export default function TeamVotingSection({
       setVoting(response)
       onSessionStatusChange?.(response.sessionStatus)
       onSessionVotingChange?.(response)
+      onVoteChanged?.()
       return undefined
     } catch (exception) {
       const error = normalizedError(exception, 'Không thể lưu phiếu đánh giá.')

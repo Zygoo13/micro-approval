@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError, api, auth } from '../lib/api'
 import type { SessionReviewer, SessionVoting, SharedReviewSessionDetail, WorkspaceDetail } from '../types'
 import SharedSessionDetailPage from './SharedSessionDetailPage'
@@ -51,6 +51,13 @@ function votingState(closed: boolean): SessionVoting {
 
 afterEach(() => vi.restoreAllMocks())
 
+beforeEach(() => {
+  vi.spyOn(api, 'getSessionAuditTimeline').mockResolvedValue({
+    sessionId: 'session-1', events: [], page: 0, size: 20,
+    totalElements: 0, totalPages: 0, hasNext: false,
+  })
+})
+
 function renderPage(response: SharedReviewSessionDetail = detail) {
   vi.spyOn(api, 'getWorkspaceById').mockResolvedValue(workspace)
   vi.spyOn(api, 'getSharedReviewSession').mockResolvedValue(response)
@@ -98,6 +105,7 @@ describe('SharedSessionDetailPage', () => {
     expect(screen.getByText('Giá trị âm đã được kiểm tra chưa?')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Reviewers' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Team Voting' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Audit Timeline' })).toBeInTheDocument()
   })
 
   it('treats AI fallback as a successful session with Rule cards', async () => {
@@ -147,6 +155,7 @@ describe('SharedSessionDetailPage', () => {
       closedByDisplayName: 'Owner User', closeReason: 'Ready to release',
       lifecycleVersion: 4,
     })
+    const getAudit = vi.mocked(api.getSessionAuditTimeline)
     render(<MemoryRouter initialEntries={['/workspaces/workspace-1/sessions/session-1']}>
       <Routes><Route path="/workspaces/:workspaceId/sessions/:sessionId" element={<SharedSessionDetailPage />} /></Routes>
     </MemoryRouter>)
@@ -166,6 +175,7 @@ describe('SharedSessionDetailPage', () => {
     expect(getDetail).toHaveBeenCalledTimes(2)
     await waitFor(() => expect(getVoting).toHaveBeenCalledTimes(2))
     expect(getReviewers.mock.calls.length).toBeGreaterThanOrEqual(4)
+    await waitFor(() => expect(getAudit).toHaveBeenCalledTimes(2))
   })
 
   it('reopen refresh restores voting and reviewer controls for ADMIN', async () => {
@@ -193,6 +203,7 @@ describe('SharedSessionDetailPage', () => {
       sessionId: 'session-1', status: 'APPROVED', closed: false, closedAt: null,
       closedByUserId: null, closedByDisplayName: null, closeReason: null, lifecycleVersion: 5,
     })
+    const getAudit = vi.mocked(api.getSessionAuditTimeline)
     render(<MemoryRouter initialEntries={['/workspaces/workspace-1/sessions/session-1']}>
       <Routes><Route path="/workspaces/:workspaceId/sessions/:sessionId" element={<SharedSessionDetailPage />} /></Routes>
     </MemoryRouter>)
@@ -207,6 +218,7 @@ describe('SharedSessionDetailPage', () => {
     expect(screen.getByRole('button', { name: 'Phân công' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Gỡ reviewer' })).toBeInTheDocument()
     expect(reopen).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(getAudit).toHaveBeenCalledTimes(2))
   })
 
   it.each([
@@ -215,6 +227,7 @@ describe('SharedSessionDetailPage', () => {
   ])('does not render %s after the API hides it', async (_name, apiError) => {
     const getReviewers = vi.spyOn(api, 'getSessionReviewers')
     const getVoting = vi.spyOn(api, 'getSessionVoting')
+    const getAudit = vi.mocked(api.getSessionAuditTimeline)
     vi.spyOn(api, 'getWorkspaceById').mockResolvedValue(workspace)
     vi.spyOn(api, 'getSharedReviewSession').mockRejectedValue(apiError)
     render(<MemoryRouter initialEntries={['/workspaces/workspace-1/sessions/missing']}>
@@ -225,5 +238,6 @@ describe('SharedSessionDetailPage', () => {
     expect(screen.queryByRole('heading', { name: 'Reviewers' })).not.toBeInTheDocument()
     expect(getReviewers).not.toHaveBeenCalled()
     expect(getVoting).not.toHaveBeenCalled()
+    expect(getAudit).not.toHaveBeenCalled()
   })
 })

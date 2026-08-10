@@ -104,10 +104,12 @@ function renderSection({
   role = 'REVIEWER',
   roster = [reviewer(role)],
   response = voting(),
+  onVoteChanged,
 }: {
   role?: WorkspaceRole
   roster?: SessionReviewer[]
   response?: SessionVoting
+  onVoteChanged?: () => void
 } = {}) {
   vi.spyOn(auth, 'getCurrentUserEmail').mockReturnValue('reviewer@example.com')
   vi.spyOn(api, 'getSessionVoting').mockResolvedValue(response)
@@ -116,6 +118,7 @@ function renderSection({
     workspace={workspace(role)}
     sessionId="session-1"
     decisionCards={response.cards.length ? [card] : []}
+    onVoteChanged={onVoteChanged}
   />)
 }
 
@@ -222,7 +225,8 @@ describe('TeamVotingSection permission-aware form', () => {
 
 describe('TeamVotingSection create and update', () => {
   it('creates APPROVED without note or version and updates from authoritative response', async () => {
-    renderSection()
+    const onVoteChanged = vi.fn()
+    renderSection({ onVoteChanged })
     const result = voting({ sessionStatus: 'APPROVED' }, [vote()])
     result.cards[0].teamDecision = 'APPROVED'
     result.cards[0].validVoteCount = 1
@@ -236,6 +240,7 @@ describe('TeamVotingSection create and update', () => {
     ))
     expect(await screen.findByRole('button', { name: 'Cập nhật phiếu' })).toBeInTheDocument()
     expect(screen.getAllByText('Đã duyệt').length).toBeGreaterThan(0)
+    expect(onVoteChanged).toHaveBeenCalledTimes(1)
   })
 
   it('requires a trimmed note for REJECTED before calling the API', async () => {

@@ -57,10 +57,15 @@ function renderSection(
   role: WorkspaceRole,
   roster: SessionReviewer[] = [],
   memberList: WorkspaceMember[] = members,
+  onRosterChanged?: () => void,
 ) {
   vi.spyOn(api, 'getSessionReviewers').mockResolvedValue(roster)
   vi.spyOn(api, 'getWorkspaceMembers').mockResolvedValue(memberList)
-  return render(<SessionReviewersSection workspace={workspace(role)} sessionId="session-1" />)
+  return render(<SessionReviewersSection
+    workspace={workspace(role)}
+    sessionId="session-1"
+    onRosterChanged={onRosterChanged}
+  />)
 }
 
 describe('SessionReviewersSection roster and permissions', () => {
@@ -154,8 +159,9 @@ describe('SessionReviewersSection roster and permissions', () => {
 describe('SessionReviewersSection assignment', () => {
   it('validates selection and updates the roster after assign/reactivate response', async () => {
     const assign = vi.spyOn(api, 'assignSessionReviewer').mockResolvedValue(reviewer)
+    const onRosterChanged = vi.fn()
     const user = userEvent.setup()
-    renderSection('OWNER', [], [members[2]])
+    renderSection('OWNER', [], [members[2]], onRosterChanged)
     await screen.findByRole('button', { name: 'Phân công' })
 
     await user.click(screen.getByRole('button', { name: 'Phân công' }))
@@ -169,6 +175,7 @@ describe('SessionReviewersSection assignment', () => {
     })
     expect(await screen.findByText('Review User')).toBeInTheDocument()
     expect(screen.getByLabelText('Reviewer')).toHaveValue('')
+    expect(onRosterChanged).toHaveBeenCalledTimes(1)
   })
 
   it('disables submit while assigning', async () => {
@@ -227,7 +234,8 @@ describe('SessionReviewersSection removal', () => {
       resolveRemove = resolve
     }))
     const user = userEvent.setup()
-    renderSection('ADMIN', [reviewer])
+    const onRosterChanged = vi.fn()
+    renderSection('ADMIN', [reviewer], members, onRosterChanged)
     await user.click(await screen.findByRole('button', { name: 'Gỡ reviewer' }))
     await user.type(screen.getByLabelText('Lý do'), '  Chuyển reviewer khác  ')
     await user.click(screen.getByRole('button', { name: 'Xác nhận gỡ' }))
@@ -244,6 +252,7 @@ describe('SessionReviewersSection removal', () => {
       version: 1,
     })
     expect(await screen.findByText('Chưa có reviewer nào được phân công.')).toBeInTheDocument()
+    expect(onRosterChanged).toHaveBeenCalledTimes(1)
   })
 
   it('keeps UI stable and refreshes after repeated remove conflict', async () => {

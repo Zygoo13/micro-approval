@@ -5,6 +5,69 @@ export type TeamVoteDecision = 'APPROVED' | 'REJECTED'
 export type TeamDecisionStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
 export type SessionVotingStatus = 'PENDING' | 'IN_REVIEW' | 'APPROVED' | 'REJECTED'
 
+export type TeamReviewAuditEventType =
+  | 'REVIEWER_ASSIGNED'
+  | 'REVIEWER_REMOVED'
+  | 'REVIEWER_REACTIVATED'
+  | 'VOTE_CREATED'
+  | 'VOTE_UPDATED'
+  | 'SESSION_CLOSED'
+  | 'SESSION_REOPENED'
+
+export interface SessionAuditActor {
+  actorUserId: string | null
+  actorDisplayName: string | null
+  actorEmail: string | null
+}
+
+export interface SessionAuditTarget {
+  targetUserId: string | null
+  targetDisplayName: string | null
+  targetAssignmentId: string | null
+}
+
+export interface SessionAuditCard {
+  decisionCardId: string | null
+  decisionCardSummary: string | null
+}
+
+export interface SessionAuditValue {
+  status: string | null
+  decision: string | null
+  note: string | null
+  assignmentVersion: number | null
+  voteVersion: number | null
+  closed: boolean | null
+  closedAt: string | null
+  closedByUserId: string | null
+  closeReason: string | null
+  lifecycleVersion: number | null
+  reopenedAt: string | null
+}
+
+export interface SessionAuditChange {
+  oldValue: SessionAuditValue | null
+  newValue: SessionAuditValue | null
+}
+
+export interface SessionAuditEvent extends SessionAuditActor, SessionAuditTarget, SessionAuditCard {
+  eventId: string
+  eventType: TeamReviewAuditEventType
+  reason: string | null
+  change: SessionAuditChange | null
+  createdAt: string
+}
+
+export interface SessionAuditTimeline {
+  sessionId: string
+  events: SessionAuditEvent[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
+  hasNext: boolean
+}
+
 export interface SharedSessionLifecycleState {
   sessionId: string
   status: SessionVotingStatus

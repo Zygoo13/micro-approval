@@ -39,9 +39,9 @@ direct administration of already registered users, and end-to-end invitations:
     roster mutation writes a transactional audit event.
 
 Email delivery, public invitation links, self-leave, ownership transfer,
-comments, the Audit Timeline frontend, notifications, webhooks, and integrations
-remain outside these slices. The read-only Audit Timeline backend API is
-implemented.
+comments, notifications, webhooks, and integrations remain outside the MVP.
+The read-only paginated Audit Timeline is implemented in both backend and
+frontend.
 
 ## Frontend
 
@@ -82,8 +82,17 @@ result, closer/time/reason, reviewer roster, votes, notes, and aggregates while
 hiding vote and roster mutations. A lifecycle `409` triggers one authoritative
 detail/vote/reviewer refresh without automatically retrying the mutation.
 REVIEWER, MEMBER, and AUDITOR remain read-only. Personal Session routes do not
-render lifecycle controls or call lifecycle APIs. Comments and the Audit
-Timeline frontend remain outside this slice.
+render lifecycle controls or call lifecycle APIs. Comments remain outside this
+slice.
+
+Shared Session Detail also renders a read-only Audit Timeline for every ACTIVE
+role. The first 20 newest events load on mount; `Tải thêm` appends older pages,
+deduplicates by event ID, and preserves backend ordering. Reviewer, vote, close,
+and reopen successes reset the timeline to page zero without reloading the route.
+Reviewer notes and removal/close reasons are shown as escaped wrapping text;
+internal JSON and raw submitted content are never rendered by this section.
+Partial legacy events use safe actor, target, card, and timestamp fallbacks.
+Personal Session routes neither render the section nor call its API.
 
 The React application provides four Team Workspace route patterns:
 
@@ -671,6 +680,12 @@ roles, hidden-resource authorization, all seven event kinds, typed safe mapping,
 removed targets, optional relations, deterministic ordering and pagination,
 empty timelines, malformed/unknown JSON, and invalid page parameters.
 
+`SessionAuditTimeline.test.tsx` covers loading/empty/error/retry, all seven event
+types, partial and unknown events, invalid timestamps, escaped HTML-like notes,
+Load More ordering and deduplication, page-two failure/retry, and page-zero
+refresh. Shared detail and existing mutation-section tests cover refresh after
+assign/remove/reactivate, vote, close, and reopen plus Personal isolation.
+
 ## Main implementation files
 
 - `entity/Workspace.java`, `entity/WorkspaceMember.java`, and their enums.
@@ -708,16 +723,19 @@ empty timelines, malformed/unknown JSON, and invalid page parameters.
 - `frontend/src/features/workspace/SessionReviewersSection.tsx`.
 - `frontend/src/features/workspace/TeamVotingSection.tsx`.
 - `frontend/src/features/workspace/SharedSessionLifecycleControls.tsx`.
+- `frontend/src/features/workspace/SessionAuditTimeline.tsx`.
 - `frontend/src/pages/MyInvitationsPage.tsx` and route `/invitations`.
 
-## Next Team Workspace work
+## Work after MVP stabilization
 
-Continue in separate vertical slices:
+Feature development should pause while the MVP moves into production
+engineering. Prioritize:
 
-1. Audit Timeline frontend consuming the implemented read-only backend API.
-2. Optional email delivery and authenticated invitation links.
-3. Projects owned by a workspace.
-4. Notifications, audit projections, and integrations.
+1. Deployment configuration, production secret management, monitoring, CI/CD,
+   and backup/restore rehearsal.
+2. A disposable integration-test database for CI and parallel execution.
+3. Only after a separate product decision: email delivery, projects,
+   notifications, richer audit projections, and integrations.
 
 All future collaboration features must use `Workspace` and `WorkspaceMember`.
 Do not reintroduce a parallel Team persistence model.

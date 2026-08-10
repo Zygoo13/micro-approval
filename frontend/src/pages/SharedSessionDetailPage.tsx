@@ -6,6 +6,7 @@ import type { SessionVoting, SessionVotingStatus, SharedReviewSessionDetail, Wor
 import SessionReviewersSection from '../features/workspace/SessionReviewersSection'
 import TeamVotingSection from '../features/workspace/TeamVotingSection'
 import SharedSessionLifecycleControls from '../features/workspace/SharedSessionLifecycleControls'
+import SessionAuditTimeline from '../features/workspace/SessionAuditTimeline'
 
 export default function SharedSessionDetailPage() {
   const { workspaceId, sessionId } = useParams()
@@ -14,6 +15,11 @@ export default function SharedSessionDetailPage() {
   const [error, setError] = useState<ApiError>()
   const [loading, setLoading] = useState(true)
   const [sectionsRefreshKey, setSectionsRefreshKey] = useState(0)
+  const [auditRefreshKey, setAuditRefreshKey] = useState(0)
+
+  const refreshAudit = useCallback(() => {
+    setAuditRefreshKey(current => current + 1)
+  }, [])
 
   const updateVotingStatus = useCallback((status: SessionVotingStatus) => {
     setSession(current => current && current.status !== status
@@ -61,7 +67,8 @@ export default function SharedSessionDetailPage() {
   const refreshAuthoritativeState = useCallback(async () => {
     await load(false)
     setSectionsRefreshKey(current => current + 1)
-  }, [load])
+    refreshAudit()
+  }, [load, refreshAudit])
 
   useEffect(() => {
     void load(true)
@@ -110,7 +117,10 @@ export default function SharedSessionDetailPage() {
       sessionId={session.id}
       closed={session.closed}
       refreshKey={sectionsRefreshKey}
-      onRosterChanged={() => setSectionsRefreshKey(current => current + 1)}
+      onRosterChanged={() => {
+        setSectionsRefreshKey(current => current + 1)
+        refreshAudit()
+      }}
     />
 
     <details className="source-panel">
@@ -128,6 +138,13 @@ export default function SharedSessionDetailPage() {
       refreshKey={sectionsRefreshKey}
       onSessionStatusChange={updateVotingStatus}
       onSessionVotingChange={updateVotingState}
+      onVoteChanged={refreshAudit}
+    />
+
+    <SessionAuditTimeline
+      workspaceId={workspace.id}
+      sessionId={session.id}
+      refreshKey={auditRefreshKey}
     />
   </section>
 }

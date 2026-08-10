@@ -6,7 +6,9 @@ The repository currently uses a **light layer-first structure** in the backend a
 
 For future modules, use **feature-first boundaries inside the existing application**, while keeping truly cross-cutting code in shared locations. Do not introduce extra hexagonal/CQRS layers until a module has a real second adapter, complex workflow, or independent deployment need.
 
-The canonical business specification is currently maintained at `C:\Users\AD\Desktop\prj new ban chinh\nghiep-vu-micro-approval-v3-final.md`. Before team collaboration or deployment, copy/version that document under `docs/` in a separate documentation-only change so it is available to every contributor.
+Repository-owned collaboration contracts are versioned under `docs/`. Do not
+make the build or onboarding process depend on a contributor-specific desktop
+path; any future canonical specification must be copied into `docs/` first.
 
 The canonical collaboration model is:
 
@@ -67,6 +69,21 @@ micro-approval/
 - `security`, `config`, and `exception` are cross-cutting and remain outside a business feature package.
 - Every database change is a new forward-only Flyway migration. Do not edit an applied migration.
 
+### Implemented module ownership
+
+| Module | Current entry points | Ownership |
+|---|---|---|
+| Authentication | `AuthController`, `AuthService`, `security/` | Register/login, BCrypt, JWT generation and request authentication |
+| Personal | `PersonalSessionController`, `PersonalSessionService` | Private sessions, Personal Decision Cards and one-user decisions |
+| Rule/AI | `ReviewAnalysisPipeline`, `RuleEngineService`, AI services | Rule-first analysis, encrypted BYOK provider configuration and fallback |
+| Workspace | Workspace controllers/services | Workspace aggregate, access policy and membership lifecycle |
+| Invitation | Invitation controllers, `WorkspaceInvitationService` | Invite administration and recipient accept/reject lifecycle |
+| Shared Session | `SharedReviewSessionController`, related services | Workspace-scoped session create/list/detail and analysis |
+| Reviewer | `ReviewSessionReviewerController`, related service | Assignment, soft removal/reactivation and eligibility coordination |
+| Voting | `TeamVotingController`, voting/aggregation services | Mutable reviewer votes, optimistic versioning, quorum and aggregates |
+| Lifecycle | `SharedReviewSessionLifecycleService` | Close/reopen, frozen result and mutation guards |
+| Audit | `TeamReviewAuditTimelineController`, related service | Safe typed newest-first timeline projection and pagination |
+
 ### Frontend
 
 - `pages` contains route-level composition only. When a screen grows reusable controls, move those controls into its feature folder.
@@ -78,6 +95,10 @@ micro-approval/
 - `features/workspace/SharedSessionLifecycleControls.tsx` owns close/reopen
   presentation and mutation state. The route page coordinates successful and
   conflicting mutations with authoritative detail, voting, and reviewer refreshes.
+- `features/workspace/SessionAuditTimeline.tsx` owns the read-only Shared Session
+  audit projection. It preserves backend order, appends deduplicated pages, uses
+  safe fallbacks for partial legacy events, and resets to page zero after a
+  successful reviewer, vote, close, or reopen mutation.
 - Team Voting consumes only backend-provided quorum and aggregate fields. Vote updates
   include the current `version`; a `409` triggers an authoritative refetch without
   automatically resubmitting the user's mutation.
@@ -168,7 +189,7 @@ page.
 |---|---|---|
 | Rule Engine | `rule/` when it gains workspace rules/admin APIs | Pattern lifecycle, priority, validation, and deterministic findings |
 | AI Engine | `ai/` when providers/configuration expand | Provider adapters, encrypted credentials, structured-output validation, usage accounting |
-| Team Workspace | `workspace/` when its use cases outgrow the current layers | Workspaces, membership, roles, projects, assignment policy |
+| Workspace | `workspace/` when its use cases outgrow the current layers | Workspaces, membership, roles, projects, assignment policy |
 | Notification | `notification/` | Domain events and in-app delivery; do not couple it directly to controllers |
 | Audit | `audit/` | Read-only projections, audit links, export policy, data redaction |
 | Webhook | `webhook/` | Provider-specific signature verification and translation into application commands |
