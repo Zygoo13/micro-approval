@@ -22,19 +22,44 @@ authorization, persistence, and test contracts.
 There is intentionally no root `package.json`. Run npm commands from
 `frontend/`.
 
-## Local database
+## Configure the environment
+
+Create the local environment file before using Compose:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Fill every required blank value in `.env`. Generate independent secrets instead
+of copying examples from documentation:
+
+```powershell
+$jwt = [Convert]::ToBase64String(
+  [System.Security.Cryptography.RandomNumberGenerator]::GetBytes(48)
+)
+$encryption = [Convert]::ToBase64String(
+  [System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32)
+)
+```
+
+Use `$jwt` for `JWT_SECRET`, `$encryption` for
+`AI_CREDENTIAL_ENCRYPTION_KEY`, and choose unique MySQL passwords. `.env` is
+ignored by Git; only the non-secret [.env.example](.env.example) is committed.
+
+## Local development
+
+### Local database
 
 Start the repository's MySQL 8 container:
 
 ```powershell
-docker compose up -d
+docker compose up -d mysql
 docker compose ps
 ```
 
-The compose file creates `micro_approval_db`, local user `dev_user`, and a
-persistent `mysql_data` volume. These credentials are development-only. Do not
-reuse them in a deployed environment, and do not run `docker compose down -v`
-unless you deliberately want to erase the local database volume.
+The Compose file creates the schema and application user configured in `.env`.
+MySQL is published on `MYSQL_HOST_PORT` (3306 by default) so the host backend can
+connect during development. Data lives in the named `mysql_data` volume.
 
 ## Environment variables
 
@@ -46,8 +71,8 @@ deployment-specific values through environment variables or a secret manager.
 | `DB_HOST` | `localhost` | MySQL host |
 | `DB_PORT` | `3306` | MySQL port |
 | `DB_NAME` | `micro_approval_db` | Database/schema |
-| `DB_USER` | `dev_user` | Database user |
-| `DB_PASS` | `dev_password` | Database password |
+| `DB_USER` | value from `.env` | Database user |
+| `DB_PASS` | value from `.env` | Database password |
 | `JWT_SECRET` | local development fallback | JWT HMAC secret; mandatory override outside local development |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:3000,http://127.0.0.1:3000` | Comma-separated exact frontend origins; never use `*` for the authenticated deployment |
 | `WORKSPACE_INVITATION_EXPIRATION_DAYS` | `7` | Invitation lifetime |
@@ -55,17 +80,6 @@ deployment-specific values through environment variables or a secret manager.
 | `AI_CREDENTIAL_ENCRYPTION_KEY` | empty | Base64-encoded 32-byte AES key; required before users can save provider keys |
 | `RULE_ENGINE_MAX_CARDS_PER_SESSION` | `10` | Deterministic card cap |
 | `AI_ANALYSIS_MAX_CARDS_PER_SESSION` | `10` | Total analysis card cap |
-
-Generate local secrets once per environment:
-
-```powershell
-$env:JWT_SECRET = [Convert]::ToBase64String(
-  [System.Security.Cryptography.RandomNumberGenerator]::GetBytes(48)
-)
-$env:AI_CREDENTIAL_ENCRYPTION_KEY = [Convert]::ToBase64String(
-  [System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32)
-)
-```
 
 Keep the encryption key stable across restarts. Losing or rotating it without a
 migration makes previously encrypted provider keys unreadable; users must then
@@ -84,6 +98,9 @@ The API starts on `http://localhost:8080`. On startup, Flyway validates and
 applies every immutable migration from V1 through V14. Hibernate uses
 `ddl-auto=validate`; it never creates or repairs the schema. Add a new forward
 migration for every schema change and never edit a migration already applied.
+When the Compose MySQL user differs from the application's local defaults, set
+`DB_NAME`, `DB_USER` and `DB_PASS` in the backend terminal to the matching
+values from `.env` before starting Spring Boot.
 
 The backend can run without an OpenAI/Gemini key. Users configure their own
 provider, model, and key under **Thiết lập AI**. Without an active user
@@ -105,13 +122,59 @@ Open `http://localhost:3000`. Vite proxies `/gateway/*` to the backend's
 hosting must provide the equivalent API routing or an explicit deployment
 configuration.
 
+## Full Docker production baseline
+
+With `.env` configured, build and start the complete stack from the repository
+root:
+
+```powershell
+docker compose config
+docker compose up --build -d
+docker compose ps
+```
+
+Open `http://localhost:3000`, or the value selected with `FRONTEND_PORT`.
+The browser sends `/gateway/*` requests to the frontend container. Nginx
+rewrites them to `/api/*` and proxies them to `backend:8080` on the internal
+Compose network. The backend is intentionally not published to the host; this
+keeps browser traffic same-origin and avoids exposing an unnecessary port.
+If `FRONTEND_PORT` changes, update `CORS_ALLOWED_ORIGINS` to the corresponding
+exact `localhost`/`127.0.0.1` origins. Do not replace the list with `*`.
+
+The container path is:
+
+```text
+Browser -> frontend (Nginx) -> backend (Spring Boot) -> mysql
+```
+
+The backend waits for the MySQL healthcheck, then Flyway migrates a fresh
+database through V14 and Hibernate validates the resulting schema. No schema
+SQL import or Hibernate `create`/`update` mode is used.
+
+Useful operational commands:
+
+```powershell
+docker compose logs -f backend
+docker compose logs -f frontend
+docker compose logs -f mysql
+docker compose restart backend
+docker compose restart frontend
+docker compose down
+```
+
+`docker compose restart` and `docker compose down` preserve `mysql_data`.
+Running `docker compose down -v` permanently deletes the Compose database
+volume; only use it for an explicitly disposable environment. To verify or test
+without touching another local stack, choose a separate project name, ports and
+volume namespace, for example `docker compose -p micro-approval-e2e ...`.
+
 ## Default ports
 
 | Service | Port |
 |---|---:|
 | MySQL | 3306 |
-| Spring Boot API | 8080 |
-| Vite frontend | 3000 |
+| Spring Boot API | 8080 (host development; internal-only in full Docker) |
+| Vite/Nginx frontend | 3000 |
 
 ## Verification
 
@@ -139,8 +202,8 @@ Repository whitespace validation:
 git diff --check
 ```
 
-The stabilization baseline is 109 backend tests and 134 frontend tests across
-13 files, with type-check, lint, production build, Flyway V14 validation, and
+The stabilization baseline is 109 backend tests and 136 frontend tests across
+14 files, with type-check, lint, production build, Flyway V14 validation, and
 Hibernate validation passing.
 
 ## Security and operational notes
@@ -161,12 +224,17 @@ Hibernate validation passing.
 
 - AI calls are synchronous and currently have no retry, circuit breaker, or
   provider-specific configurable timeout. Rule-only fallback is implemented.
-- There is no account deletion API. A JWT whose user was hard-deleted manually
-  in MySQL can cause public auth requests carrying that stale token to return
-  403; normal application flows never hard-delete users. Clear the browser
-  session before logging in again after manual database maintenance.
 - The MVP does not include notifications, realtime updates, GitHub integration,
   monitoring, backup/restore automation, CI/CD, or production deployment.
 - Local integration tests use the configured MySQL instance; isolated CI should
   provide a disposable database (for example, a dedicated schema or
   Testcontainers) before parallel test execution.
+
+## Production baseline limitations
+
+This Compose stack is a **Docker production baseline**, not a complete
+production deployment. It does not provide HTTPS termination, an external
+secret manager, database backup/restore automation, centralized logging,
+monitoring/alerting, orchestration, rolling deployment or autoscaling. Add those
+capabilities in later production phases without placing backend secrets in the
+frontend build.
